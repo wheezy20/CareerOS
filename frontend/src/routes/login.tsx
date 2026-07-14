@@ -11,9 +11,10 @@ export const Route = createFileRoute("/login")({
 });
 
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID as string;
+const API_BASE = import.meta.env.VITE_API_BASE_URL as string;
 
 function loginWithGithub() {
-  const redirectUri = `${window.location.origin}/api/auth/callback`;
+  const redirectUri = `${API_BASE}/auth/callback`;
   const params = new URLSearchParams({
     client_id: GITHUB_CLIENT_ID,
     redirect_uri: redirectUri,
