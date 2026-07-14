@@ -1,0 +1,43 @@
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# Build outputs
+dist/
+build/
+.next/
+
+# Data & uploads (keep locally, don't push)
+careeros.db
+data/generated/
+uploads/
+
+# IDE & OS
+.vscode/
+.DS_Store
+*.swp
+*.swo
+
+# Internal documentation (keep locally, don't push)
+SYSTEM_CONTEXT.md
+Claude_Code_Session_Reference.md
+CareerOS_DEFINITIVE_Contract.md
+CareerOS_Backend_Spec.md
+CareerOS_6Week_Checklist.md
+CareerOS_START_TODAY.md
+
+# Lovable config (if using Lovable)
+frontend/.lovable/
+
+# Temporary files
+*.log
+.cache/
