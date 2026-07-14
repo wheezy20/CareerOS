@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 
 import httpx
@@ -13,6 +14,7 @@ from app.database import get_db
 from app.models import AuthUser
 
 router = APIRouter(tags=["auth"])
+logger = logging.getLogger(__name__)
 
 JWT_ALGORITHM = "HS256"
 JWT_TTL_SECONDS = 7 * 24 * 60 * 60  # 7 days
@@ -110,6 +112,12 @@ async def github_callback(payload: CodeExchangeRequest, db: Session = Depends(ge
             },
         )
         token_data = token_res.json()
+        # TEMPORARY DIAGNOSTIC LOGGING — remove once the prod 400 is root-caused.
+        redacted = {k: ("***REDACTED***" if k == "access_token" else v) for k, v in token_data.items()}
+        logger.warning(
+            "GitHub token exchange: http_status=%s code_prefix=%s body=%s",
+            token_res.status_code, payload.code[:6], redacted,
+        )
         access_token = token_data.get("access_token")
         if not access_token:
             raise HTTPException(status_code=400, detail=token_data.get("error_description", "GitHub exchange failed"))
