@@ -11,12 +11,12 @@ export const Route = createFileRoute("/login")({
 });
 
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID as string;
-const REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI as string;
 
 function loginWithGithub() {
+  const redirectUri = `${window.location.origin}/api/auth/callback`;
   const params = new URLSearchParams({
     client_id: GITHUB_CLIENT_ID,
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: redirectUri,
     scope: "read:user",
   });
   window.location.href = `https://github.com/login/oauth/authorize?${params.toString()}`;
