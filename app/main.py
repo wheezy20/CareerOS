@@ -18,7 +18,12 @@ app = FastAPI(title="CareerOS")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:8080"],
+    allow_origins=[
+        "http://localhost:8080",
+        "http://localhost:5173",
+        "https://career-os-seven-eta.vercel.app",
+        "https://careeros-production-ecef.up.railway.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,7 +31,7 @@ app.add_middleware(
 
 protected = [Depends(require_auth)]
 
-GENERATED_DIR = Path("/home/wheezy20/projects/CareerOS/data/generated")
+GENERATED_DIR = Path("data/generated")
 GENERATED_DIR.mkdir(parents=True, exist_ok=True)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
