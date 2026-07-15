@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { PageHeader, EmptyState } from "@/components/page-header";
 import { api } from "@/lib/api";
+import { getToken } from "@/lib/auth";
 import type { Role, Project, Skill, Course, Achievement, FileEntry, LinkEntry, OtherEntry } from "@/lib/types";
 import {
   Plus, Pencil, Trash2, Briefcase, Code, Sparkles, GraduationCap,
@@ -484,6 +485,19 @@ function FilesTab() {
     if (!fs) return;
     Array.from(fs).forEach((file) => api.uploadFile(file).then((f) => { setItems((p) => [f, ...p]); toast.success(`Uploaded ${f.name}`); }));
   }
+  async function onDownload(f: FileEntry) {
+    try {
+      const token = getToken();
+      const res = await fetch(`${api.base}/knowledge-base/files/${f.id}/download`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(`Failed to get download link (${res.status})`);
+      const { url } = await res.json();
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch {
+      toast.error(`Couldn't download ${f.name}`);
+    }
+  }
   return (
     <div className="space-y-4">
       <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-card/40 py-10 transition-colors hover:border-primary/40 hover:bg-accent/30">
@@ -503,7 +517,7 @@ function FilesTab() {
                 </div>
               </div>
               <div className="flex gap-1">
-                <a href={f.url} download={f.name}><Button variant="ghost" size="icon"><Download className="h-4 w-4" /></Button></a>
+                <Button variant="ghost" size="icon" onClick={() => onDownload(f)}><Download className="h-4 w-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => api.deleteFile(f.id).then(() => setItems((p) => p.filter((x) => x.id !== f.id)))}><Trash2 className="h-4 w-4" /></Button>
               </div>
             </CardContent></Card>
