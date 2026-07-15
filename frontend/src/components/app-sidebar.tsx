@@ -1,4 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -23,6 +24,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { clearToken } from "@/lib/auth";
+import type { AuthUser } from "@/lib/types";
 
 const items = [
   { title: "Knowledge Base", url: "/knowledge", icon: BookOpen },
@@ -36,6 +38,14 @@ const items = [
 export function AppSidebar() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const navigate = useNavigate();
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    api.getMe().then(setUser).catch(() => setUser(null));
+  }, []);
+
+  const displayName = user?.login || "Signed in";
+  const avatarLetter = user?.login ? user.login[0]!.toUpperCase() : "?";
 
   function handleLogout() {
     api.logout().catch(() => {}); // best-effort — the JWT is stateless, client just drops it
@@ -82,11 +92,11 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-2 group-data-[collapsible=icon]:hidden">
           <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center text-sm font-medium text-accent-foreground">
-            E
+            {avatarLetter}
           </div>
           <div className="flex flex-1 flex-col leading-tight overflow-hidden">
-            <span className="truncate text-sm font-medium">Eyram</span>
-            <span className="truncate text-xs text-muted-foreground">eyram@example.com</span>
+            <span className="truncate text-sm font-medium">{displayName}</span>
+            <span className="truncate text-xs text-muted-foreground">GitHub account</span>
           </div>
           <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleLogout} title="Log out">
             <LogOut className="h-4 w-4" />
