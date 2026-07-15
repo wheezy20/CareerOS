@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -14,7 +14,9 @@ router = APIRouter(tags=["profile"])
 def get_profile(db: Session = Depends(get_db)) -> Profile:
     profile = db.query(Profile).filter(Profile.id == "me").first()
     if profile is None:
-        raise HTTPException(status_code=404, detail="Profile not found")
+        # No row yet (fresh install / first run) — hand back an empty, unsaved
+        # profile instead of 404ing, so the frontend can render the form.
+        return Profile(id="me", name="", email="", phone="", linkedin="", location="", avatar_url=None)
     return profile
 
 
