@@ -83,7 +83,7 @@ export const api = {
   },
 
   // Courses
-  async listCourses(): Promise<Course[]> { return delay([...mock.mockCourses]); },
+  async listCourses(): Promise<Course[]> { return USE_MOCKS ? delay([...mock.mockCourses]) : fetchJson("GET", "/knowledge-base/courses"); },
   async saveCourse(c: Omit<Course, "id"> & { id?: string }): Promise<Course> {
     return USE_MOCKS ? delay({ ...c, id: c.id ?? id() } as Course) : fetchJson("POST", "/knowledge-base/courses", c);
   },
@@ -92,7 +92,7 @@ export const api = {
   },
 
   // Achievements
-  async listAchievements(): Promise<Achievement[]> { return delay([...mock.mockAchievements]); },
+  async listAchievements(): Promise<Achievement[]> { return USE_MOCKS ? delay([...mock.mockAchievements]) : fetchJson("GET", "/knowledge-base/achievements"); },
   async saveAchievement(a: Omit<Achievement, "id"> & { id?: string }): Promise<Achievement> {
     return USE_MOCKS ? delay({ ...a, id: a.id ?? id() } as Achievement) : fetchJson("POST", "/knowledge-base/achievements", a);
   },
@@ -101,6 +101,7 @@ export const api = {
   },
 
   // Files & Links
+  // TODO: needs backend GET /knowledge-base/files endpoint
   async listFiles(): Promise<FileEntry[]> { return delay([...mock.mockFiles]); },
   async uploadFile(file: File): Promise<FileEntry> {
     if (USE_MOCKS) {
@@ -121,7 +122,7 @@ export const api = {
     return USE_MOCKS ? delay(undefined) : fetchJson("DELETE", `/knowledge-base/files/${id_}`);
   },
 
-  async listLinks(): Promise<LinkEntry[]> { return delay([...mock.mockLinks]); },
+  async listLinks(): Promise<LinkEntry[]> { return USE_MOCKS ? delay([...mock.mockLinks]) : fetchJson("GET", "/knowledge-base/links"); },
   async saveLink(l: Omit<LinkEntry, "id"> & { id?: string }): Promise<LinkEntry> {
     return USE_MOCKS ? delay({ ...l, id: l.id ?? id() } as LinkEntry) : fetchJson("POST", "/knowledge-base/links", l);
   },
@@ -130,7 +131,7 @@ export const api = {
   },
 
   // Others (misc experiences, personal works, summits, conferences, notes)
-  async listOthers(): Promise<OtherEntry[]> { return delay([...mock.mockOthers]); },
+  async listOthers(): Promise<OtherEntry[]> { return USE_MOCKS ? delay([...mock.mockOthers]) : fetchJson("GET", "/knowledge-base/others"); },
   async saveOther(o: Omit<OtherEntry, "id"> & { id?: string }): Promise<OtherEntry> {
     return USE_MOCKS ? delay({ ...o, id: o.id ?? id() } as OtherEntry) : fetchJson("POST", "/knowledge-base/others", o);
   },
@@ -140,7 +141,7 @@ export const api = {
 
 
   // Templates
-  async listTemplates(): Promise<Template[]> { return delay([]); },
+  async listTemplates(): Promise<Template[]> { return USE_MOCKS ? delay([]) : fetchJson("GET", "/templates"); },
   async uploadTemplate(kind: "cv" | "cover_letter", file: File): Promise<Template> {
     return delay({
       id: id(),
@@ -198,7 +199,7 @@ export const api = {
   },
 
   // Profile
-  async getProfile(): Promise<ProfileInfo> { return delay({ ...mock.mockProfile }); },
+  async getProfile(): Promise<ProfileInfo> { return USE_MOCKS ? delay({ ...mock.mockProfile }) : fetchJson("GET", "/profile"); },
   async saveProfile(p: ProfileInfo): Promise<ProfileInfo> {
     return USE_MOCKS ? delay(p) : fetchJson("POST", "/profile", p);
   },
