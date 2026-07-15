@@ -143,13 +143,19 @@ export const api = {
   // Templates
   async listTemplates(): Promise<Template[]> { return USE_MOCKS ? delay([]) : fetchJson("GET", "/templates"); },
   async uploadTemplate(kind: "cv" | "cover_letter", file: File): Promise<Template> {
-    return delay({
-      id: id(),
-      type: kind,
-      fileName: file.name,
-      uploadedAt: new Date().toISOString().slice(0, 10),
-      url: URL.createObjectURL(file),
-    });
+    if (USE_MOCKS) {
+      return delay({
+        id: id(),
+        type: kind,
+        fileName: file.name,
+        uploadedAt: new Date().toISOString().slice(0, 10),
+        url: URL.createObjectURL(file),
+      });
+    }
+    const form = new FormData();
+    form.append("kind", kind);
+    form.append("file", file);
+    return fetchJson("POST", "/templates", form);
   },
   async deleteTemplate(id_: string): Promise<void> {
     return USE_MOCKS ? delay(undefined) : fetchJson("DELETE", `/templates/${id_}`);
