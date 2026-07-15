@@ -101,8 +101,7 @@ export const api = {
   },
 
   // Files & Links
-  // TODO: needs backend GET /knowledge-base/files endpoint
-  async listFiles(): Promise<FileEntry[]> { return delay([...mock.mockFiles]); },
+  async listFiles(): Promise<FileEntry[]> { return USE_MOCKS ? delay([...mock.mockFiles]) : fetchJson("GET", "/knowledge-base/files"); },
   async uploadFile(file: File): Promise<FileEntry> {
     if (USE_MOCKS) {
       return delay({
