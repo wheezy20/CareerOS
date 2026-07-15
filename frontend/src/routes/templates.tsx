@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
@@ -21,6 +21,18 @@ export const Route = createFileRoute("/templates")({
 function TemplatesPage() {
   const [cv, setCv] = useState<Template | null>(null);
   const [cl, setCl] = useState<Template | null>(null);
+
+  useEffect(() => {
+    api.listTemplates()
+      .then((templates) => {
+        setCv(templates.find((t) => t.type === "cv") ?? null);
+        setCl(templates.find((t) => t.type === "cover_letter") ?? null);
+      })
+      .catch(() => {
+        setCv(null);
+        setCl(null);
+      });
+  }, []);
 
   function upload(kind: "cv" | "cover_letter", file: File | null) {
     if (!file) return;
