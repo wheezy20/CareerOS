@@ -2,7 +2,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { clearToken, getToken, isExpired } from "@/lib/auth";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/callback"];
+const PUBLIC_PATHS = ["/login", "/auth/callback"];
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const navigate = useNavigate();

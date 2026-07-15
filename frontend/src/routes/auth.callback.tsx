@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { setToken } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
-export const Route = createFileRoute("/api/auth/callback")({
+export const Route = createFileRoute("/auth/callback")({
   component: AuthCallbackPage,
 });
 

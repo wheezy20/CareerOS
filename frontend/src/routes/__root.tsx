@@ -17,7 +17,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/callback"];
+const PUBLIC_PATHS = ["/login", "/auth/callback"];
 
 function NotFoundComponent() {
   return (
