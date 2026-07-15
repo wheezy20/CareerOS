@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,6 +10,7 @@ from typing import Any
 
 from docx import Document
 from fastapi import APIRouter, Depends, HTTPException
+from google.cloud import storage
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -79,18 +82,49 @@ def _find_profile_context(db: Session) -> dict[str, Any]:
     )
 
 
-def _resolve_template_path(db: Session, kind: str) -> Path:
+def _latest_template(db: Session, kind: str) -> Template | None:
     # Template.id is a random UUID hex, not time-ordered, so sorting by it does not
     # give the most recent upload. Row insertion order (SQLite's implicit rowid,
     # returned when no ORDER BY is applied) does.
     templates = db.query(Template).filter(Template.type == kind).all()
-    if not templates:
-        return Path("")
+    return templates[-1] if templates else None
 
-    candidate = (ROOT_DIR / templates[-1].url.lstrip("/")).resolve()
-    if candidate.exists():
-        return candidate
-    return Path("")
+
+def _resolve_template_path(template: Template | None) -> bytes:
+    """Fetch a template's file bytes from GCS (templates live in the private
+    bucket now, not on local disk — see app/services/storage_service.py).
+
+    Returns empty bytes — the caller's signal to fall back to a blank
+    template — when no template is provided, or when the GCS fetch fails
+    for any reason (missing object, auth error, etc.). Never raises, to
+    preserve the existing graceful-degrade behavior.
+    """
+    if template is None:
+        return b""
+
+    bucket_name = os.environ.get("GCS_BUCKET", "careeros-uploads-502418")
+    try:
+        client = storage.Client()
+        blob = client.bucket(bucket_name).blob(template.url)
+        return blob.download_as_bytes()
+    except Exception as exc:
+        logger.error("Failed to fetch template %r from GCS bucket %r: %s", template.url, bucket_name, exc)
+        return b""
+
+
+def _write_temp_template(data: bytes) -> str:
+    """Bridge GCS-fetched template bytes into the existing str-path-based
+    docx loading pipeline (app/services/document_service.py) without
+    changing that pipeline. Returns "" (meaning "no template") for empty
+    bytes, matching what that pipeline already treats as "use blank"."""
+    if not data:
+        return ""
+    tmp = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
+    try:
+        tmp.write(data)
+    finally:
+        tmp.close()
+    return tmp.name
 
 
 @router.post("/generate/cv")
@@ -108,18 +142,21 @@ def generate_cv(payload: dict[str, str], db: Session = Depends(get_db)) -> dict[
     # customize_cv_text / generate_cv_docx already convert Claude/template failures
     # into deterministic fallbacks internally and don't raise — this is a second,
     # redundant safety net so this route can never return a 5xx either way.
+    template_path = ""
     try:
         customized_bullets = customize_cv_text(profile_context, parsed_job)
-        template_path = _resolve_template_path(db, "cv")
-        generated_path = generate_cv_docx(
-            str(template_path) if template_path.exists() else "", customized_bullets, str(output_path)
-        )
+        template_bytes = _resolve_template_path(_latest_template(db, "cv"))
+        template_path = _write_temp_template(template_bytes)
+        generated_path = generate_cv_docx(template_path, customized_bullets, str(output_path))
     except (TemplateError, ClaudeAPIError) as exc:
         logger.warning("generate_cv hit %s; writing minimal fallback document", exc)
         generated_path = _write_minimal_fallback_docx("\n".join(_FALLBACK_BULLETS), output_path)
     except Exception as exc:
         logger.error("generate_cv unexpected failure: %s; writing minimal fallback document", exc)
         generated_path = _write_minimal_fallback_docx("\n".join(_FALLBACK_BULLETS), output_path)
+    finally:
+        if template_path:
+            os.unlink(template_path)
 
     project_ids = [project.id for project in db.query(Project).all()]
     db.add(GeneratedCv(
@@ -145,17 +182,20 @@ def generate_cover_letter_endpoint(payload: dict[str, str], db: Session = Depend
     output_name = f"cover-letter_{job_id}_{uuid.uuid4().hex[:8]}.docx"
     output_path = GENERATED_DIR / output_name
 
+    template_path = ""
     try:
-        template_path = _resolve_template_path(db, "cover_letter")
-        generated_path = generate_cover_letter(
-            profile_context, parsed_job, str(template_path) if template_path.exists() else "", str(output_path)
-        )
+        template_bytes = _resolve_template_path(_latest_template(db, "cover_letter"))
+        template_path = _write_temp_template(template_bytes)
+        generated_path = generate_cover_letter(profile_context, parsed_job, template_path, str(output_path))
     except (TemplateError, ClaudeAPIError) as exc:
         logger.warning("generate_cover_letter hit %s; writing minimal fallback document", exc)
         generated_path = _write_minimal_fallback_docx(_FALLBACK_LETTER_TEXT, output_path)
     except Exception as exc:
         logger.error("generate_cover_letter unexpected failure: %s; writing minimal fallback document", exc)
         generated_path = _write_minimal_fallback_docx(_FALLBACK_LETTER_TEXT, output_path)
+    finally:
+        if template_path:
+            os.unlink(template_path)
 
     version = f"v1-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
     return {"url": f"/generated/{output_name}", "version": version, "path": generated_path}
