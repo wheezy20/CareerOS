@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import uuid
+from datetime import datetime
+from pathlib import Path
 from typing import Type, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File
@@ -17,6 +20,7 @@ from app.schemas import (
     RoleSchema,
     SkillSchema,
 )
+from app.services.storage_service import generate_signed_url, upload_bytes
 
 router = APIRouter(tags=["knowledge-base"])
 
@@ -180,19 +184,41 @@ def delete_other(other_id: str, db: Session = Depends(get_db)) -> Response:
     return Response(status_code=204)
 
 
+@router.get("/files", response_model=list[FileEntrySchema], response_model_by_alias=True)
+def list_files(db: Session = Depends(get_db)) -> list[FileEntry]:
+    return db.query(FileEntry).all()
+
+
 @router.post("/files", response_model=FileEntrySchema, response_model_by_alias=True)
 def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)) -> FileEntry:
+    data = file.file.read()
+    suffix = Path(file.filename or "file").suffix or ".bin"
+    object_path = f"files/{uuid.uuid4().hex[:8]}{suffix}"
+    upload_bytes(object_path, data, content_type=file.content_type)
+
     payload = FileEntry(
         name=file.filename or "upload",
-        size=0,
+        size=len(data),
         type=file.content_type or "application/octet-stream",
-        url="",
-        uploaded_at="",
+        url=object_path,
+        uploaded_at=datetime.utcnow().strftime("%Y-%m-%d"),
     )
     db.add(payload)
     db.commit()
     db.refresh(payload)
     return payload
+
+
+@router.get("/files/{file_id}/download")
+def download_file(file_id: str, db: Session = Depends(get_db)) -> dict[str, str]:
+    obj = db.query(FileEntry).filter(FileEntry.id == file_id).first()
+    if obj is None:
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        url = generate_signed_url(obj.url)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"url": url}
 
 
 @router.delete("/files/{file_id}", status_code=204)

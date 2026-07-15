@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -11,9 +10,13 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Template
 from app.schemas import TemplateSchema
+from app.services.storage_service import generate_signed_url, upload_bytes
 
 router = APIRouter(tags=["templates"])
 
+# app/main.py imports UPLOAD_DIR to mount a static /uploads route. Template
+# files are no longer written to local disk (they go to GCS instead), but
+# the directory constant stays so that mount doesn't break on startup.
 UPLOAD_DIR = Path("/tmp/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -33,23 +36,32 @@ def upload_template(
         raise HTTPException(status_code=400, detail="kind must be 'cv' or 'cover_letter'")
 
     suffix = Path(file.filename or "template").suffix or ".bin"
-    stored_name = f"{uuid.uuid4().hex[:8]}{suffix}"
-    saved_path = UPLOAD_DIR / stored_name
-
-    with saved_path.open("wb") as handle:
-        handle.write(file.file.read())
+    object_path = f"templates/{uuid.uuid4().hex[:8]}{suffix}"
+    upload_bytes(object_path, file.file.read(), content_type=file.content_type)
 
     uploaded_at = datetime.utcnow().strftime("%Y-%m-%d")
     record = Template(
         type=kind,
-        file_name=file.filename or stored_name,
+        file_name=file.filename or object_path,
         uploaded_at=uploaded_at,
-        url=f"/uploads/{stored_name}",
+        url=object_path,
     )
     db.add(record)
     db.commit()
     db.refresh(record)
     return record
+
+
+@router.get("/{template_id}/download")
+def download_template(template_id: str, db: Session = Depends(get_db)) -> dict[str, str]:
+    obj = db.query(Template).filter(Template.id == template_id).first()
+    if obj is None:
+        raise HTTPException(status_code=404, detail="Template not found")
+    try:
+        url = generate_signed_url(obj.url)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"url": url}
 
 
 @router.delete("/{template_id}", status_code=204)
