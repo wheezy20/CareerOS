@@ -20,9 +20,11 @@ export const Route = createFileRoute("/settings")({
   }),
 });
 
+const EMPTY_PROFILE: ProfileInfo = { name: "", email: "", phone: "", linkedin: "", location: "" };
+
 function SettingsPage() {
   const [p, setP] = useState<ProfileInfo | null>(null);
-  useEffect(() => { api.getProfile().then(setP); }, []);
+  useEffect(() => { api.getProfile().then(setP).catch(() => setP(EMPTY_PROFILE)); }, []);
 
   function save() {
     if (!p) return;
