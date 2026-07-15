@@ -14,7 +14,7 @@ from app.schemas import TemplateSchema
 
 router = APIRouter(tags=["templates"])
 
-UPLOAD_DIR = Path("/home/wheezy20/projects/CareerOS/uploads")
+UPLOAD_DIR = Path("/tmp/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
