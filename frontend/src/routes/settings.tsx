@@ -38,12 +38,12 @@ function SettingsPage() {
       <Card><CardContent className="p-6">
         <h3 className="mb-4 font-medium">Personal info</h3>
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Name" value={p.name} onChange={(v) => setP({ ...p, name: v })} />
-          <Field label="Email" value={p.email} onChange={(v) => setP({ ...p, email: v })} />
-          <Field label="Phone" value={p.phone} onChange={(v) => setP({ ...p, phone: v })} />
-          <Field label="Location" value={p.location} onChange={(v) => setP({ ...p, location: v })} />
+          <Field label="Name" placeholder="e.g. Jane Doe" value={p.name} onChange={(v) => setP({ ...p, name: v })} />
+          <Field label="Email" placeholder="you@example.com" value={p.email} onChange={(v) => setP({ ...p, email: v })} />
+          <Field label="Phone" placeholder="+233 55 123 4567" value={p.phone} onChange={(v) => setP({ ...p, phone: v })} />
+          <Field label="Location" placeholder="e.g. Accra, Ghana" value={p.location} onChange={(v) => setP({ ...p, location: v })} />
           <div className="md:col-span-2">
-            <Field label="LinkedIn" value={p.linkedin} onChange={(v) => setP({ ...p, linkedin: v })} />
+            <Field label="LinkedIn" placeholder="https://linkedin.com/in/yourname" value={p.linkedin} onChange={(v) => setP({ ...p, linkedin: v })} />
           </div>
         </div>
         <div className="mt-4 flex justify-end">
@@ -85,11 +85,11 @@ function SettingsPage() {
   );
 }
 
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function Field({ label, placeholder, value, onChange }: { label: string; placeholder?: string; value: string; onChange: (v: string) => void }) {
   return (
     <div>
       <Label className="mb-1.5 block">{label}</Label>
-      <Input value={value} onChange={(e) => onChange(e.target.value)} />
+      <Input placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }

@@ -147,18 +147,18 @@ function RoleDialog({ role, onSave }: { role: Role | null; onSave: (r: Role) => 
       <DialogHeader><DialogTitle>{role ? "Edit role" : "Add role"}</DialogTitle></DialogHeader>
       <div className="space-y-4">
         <div className="grid gap-4 md:grid-cols-2">
-          <div><Label>Job title</Label><Input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
-          <div><Label>Company</Label><Input value={f.company} onChange={(e) => setF({ ...f, company: e.target.value })} /></div>
+          <div><Label>Job title</Label><Input placeholder="e.g. Data Analyst" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
+          <div><Label>Company</Label><Input placeholder="e.g. Acme Inc." value={f.company} onChange={(e) => setF({ ...f, company: e.target.value })} /></div>
           <div><Label>Start</Label><Input type="month" value={f.startDate} onChange={(e) => setF({ ...f, startDate: e.target.value })} /></div>
           <div><Label>End (blank = current)</Label><Input type="month" value={f.endDate ?? ""} onChange={(e) => setF({ ...f, endDate: e.target.value || null })} /></div>
         </div>
-        <div><Label>Description</Label><Textarea rows={3} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></div>
+        <div><Label>Description</Label><Textarea rows={3} placeholder="e.g. Led the checkout redesign that cut cart abandonment by 18%" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></div>
         <div>
           <Label>Key achievements</Label>
           <div className="space-y-2 mt-1">
             {f.achievements.map((a, i) => (
               <div key={i} className="flex gap-2">
-                <Input value={a} onChange={(e) => { const next = [...f.achievements]; next[i] = e.target.value; setF({ ...f, achievements: next }); }} />
+                <Input placeholder="e.g. Increased test coverage from 40% to 85%" value={a} onChange={(e) => { const next = [...f.achievements]; next[i] = e.target.value; setF({ ...f, achievements: next }); }} />
                 <Button variant="ghost" size="icon" onClick={() => setF({ ...f, achievements: f.achievements.filter((_, j) => j !== i) })}><X className="h-4 w-4" /></Button>
               </div>
             ))}
@@ -242,8 +242,8 @@ function ProjectDialog({ project, onSave }: { project: Project | null; onSave: (
     <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
       <DialogHeader><DialogTitle>{project ? "Edit project" : "Add project"}</DialogTitle></DialogHeader>
       <div className="space-y-4">
-        <div><Label>Title</Label><Input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
-        <div><Label>Description</Label><Textarea rows={3} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></div>
+        <div><Label>Title</Label><Input placeholder="e.g. Personal Finance Tracker" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
+        <div><Label>Description</Label><Textarea rows={3} placeholder="e.g. A web app that helps users track spending across linked accounts" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></div>
         <div>
           <Label>Technologies</Label>
           <div className="mt-1 flex flex-wrap gap-1.5">
@@ -260,7 +260,7 @@ function ProjectDialog({ project, onSave }: { project: Project | null; onSave: (
           <div className="space-y-2 mt-1">
             {f.outcomes.map((o, i) => (
               <div key={i} className="flex gap-2">
-                <Input value={o} onChange={(e) => { const n = [...f.outcomes]; n[i] = e.target.value; setF({ ...f, outcomes: n }); }} />
+                <Input placeholder="e.g. Reduced onboarding time by 30%" value={o} onChange={(e) => { const n = [...f.outcomes]; n[i] = e.target.value; setF({ ...f, outcomes: n }); }} />
                 <Button variant="ghost" size="icon" onClick={() => setF({ ...f, outcomes: f.outcomes.filter((_, j) => j !== i) })}><X className="h-4 w-4" /></Button>
               </div>
             ))}
@@ -268,12 +268,12 @@ function ProjectDialog({ project, onSave }: { project: Project | null; onSave: (
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          <div><Label>Metrics</Label><Input value={f.metrics} onChange={(e) => setF({ ...f, metrics: e.target.value })} /></div>
-          <div><Label>Link</Label><Input value={f.link ?? ""} onChange={(e) => setF({ ...f, link: e.target.value })} /></div>
+          <div><Label>Metrics</Label><Input placeholder="e.g. 10k+ downloads" value={f.metrics} onChange={(e) => setF({ ...f, metrics: e.target.value })} /></div>
+          <div><Label>Link</Label><Input placeholder="https://github.com/yourname/project" value={f.link ?? ""} onChange={(e) => setF({ ...f, link: e.target.value })} /></div>
           <div><Label>Start</Label><Input type="month" value={f.startDate} onChange={(e) => setF({ ...f, startDate: e.target.value })} /></div>
           <div><Label>End</Label><Input type="month" value={f.endDate ?? ""} onChange={(e) => setF({ ...f, endDate: e.target.value || null })} /></div>
         </div>
-        <div><Label>Reflection / lessons</Label><Textarea rows={2} value={f.reflection} onChange={(e) => setF({ ...f, reflection: e.target.value })} /></div>
+        <div><Label>Reflection / lessons</Label><Textarea rows={2} placeholder="e.g. Would use TypeScript from day one next time" value={f.reflection} onChange={(e) => setF({ ...f, reflection: e.target.value })} /></div>
       </div>
       <DialogFooter><Button onClick={() => onSave({ ...f, outcomes: f.outcomes.filter(Boolean) })}>Save</Button></DialogFooter>
     </DialogContent>
@@ -344,7 +344,7 @@ function SkillDialog({ skill, onSave }: { skill: Skill | null; onSave: (s: Skill
     <DialogContent>
       <DialogHeader><DialogTitle>{skill ? "Edit skill" : "Add skill"}</DialogTitle></DialogHeader>
       <div className="space-y-4">
-        <div><Label>Name</Label><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
+        <div><Label>Name</Label><Input placeholder="e.g. Python" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
         <div>
           <Label>Category</Label>
           <Select value={f.category} onValueChange={(v) => setF({ ...f, category: v as Skill["category"] })}>
@@ -382,13 +382,13 @@ function CoursesTab() {
           <DialogContent>
             <DialogHeader><DialogTitle>Add course</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <div><Label>Name</Label><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
-              <div><Label>Provider</Label><Input value={f.provider} onChange={(e) => setF({ ...f, provider: e.target.value })} /></div>
+              <div><Label>Name</Label><Input placeholder="e.g. Machine Learning Specialization" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
+              <div><Label>Provider</Label><Input placeholder="e.g. Coursera" value={f.provider} onChange={(e) => setF({ ...f, provider: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><Label>Completed</Label><Input type="month" value={f.dateCompleted} onChange={(e) => setF({ ...f, dateCompleted: e.target.value })} /></div>
-                <div><Label>Grade</Label><Input value={f.grade} onChange={(e) => setF({ ...f, grade: e.target.value })} /></div>
+                <div><Label>Grade</Label><Input placeholder="e.g. A or 95%" value={f.grade} onChange={(e) => setF({ ...f, grade: e.target.value })} /></div>
               </div>
-              <div><Label>Key learnings</Label><Textarea rows={3} value={f.learnings} onChange={(e) => setF({ ...f, learnings: e.target.value })} /></div>
+              <div><Label>Key learnings</Label><Textarea rows={3} placeholder="e.g. Built and deployed a recommendation model using collaborative filtering" value={f.learnings} onChange={(e) => setF({ ...f, learnings: e.target.value })} /></div>
             </div>
             <DialogFooter><Button onClick={save}>Save</Button></DialogFooter>
           </DialogContent>
@@ -432,7 +432,7 @@ function AchievementsTab() {
           <DialogContent>
             <DialogHeader><DialogTitle>Add achievement</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <div><Label>Title</Label><Input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
+              <div><Label>Title</Label><Input placeholder="e.g. Best Paper Award, ICML 2024" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Type</Label>
@@ -445,7 +445,7 @@ function AchievementsTab() {
                 </div>
                 <div><Label>Date</Label><Input type="month" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></div>
               </div>
-              <div><Label>Details</Label><Textarea rows={3} value={f.details} onChange={(e) => setF({ ...f, details: e.target.value })} /></div>
+              <div><Label>Details</Label><Textarea rows={3} placeholder="e.g. Awarded for research on efficient transformer inference" value={f.details} onChange={(e) => setF({ ...f, details: e.target.value })} /></div>
             </div>
             <DialogFooter><Button onClick={save}>Save</Button></DialogFooter>
           </DialogContent>
@@ -643,7 +643,7 @@ function OtherDialog({ entry, onSave }: { entry: OtherEntry | null; onSave: (o: 
     <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
       <DialogHeader><DialogTitle>{entry ? "Edit entry" : "Add entry"}</DialogTitle></DialogHeader>
       <div className="space-y-4">
-        <div><Label>Title</Label><Input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
+        <div><Label>Title</Label><Input placeholder="e.g. Spoke at PyCon 2024" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <Label>Category</Label>
