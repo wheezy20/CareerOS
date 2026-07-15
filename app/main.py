@@ -8,7 +8,7 @@ from app.database import init_db
 from app.routes.analytics import router as analytics_router
 from app.routes.applications import router as applications_router
 from app.routes.auth import require_auth, router as auth_router
-from app.routes.generation import router as generation_router
+from app.routes.generation import ROOT_DIR, router as generation_router
 from app.routes.job import router as job_router
 from app.routes.knowledge_base import router as knowledge_base_router
 from app.routes.profile import router as profile_router
@@ -31,7 +31,7 @@ app.add_middleware(
 
 protected = [Depends(require_auth)]
 
-GENERATED_DIR = Path("data/generated")
+GENERATED_DIR = ROOT_DIR / "data" / "generated"
 GENERATED_DIR.mkdir(parents=True, exist_ok=True)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
