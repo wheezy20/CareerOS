@@ -53,7 +53,13 @@ def call_claude(prompt: str, max_tokens: int) -> str:
                 max_tokens=max_tokens,
                 messages=[{"role": "user", "content": prompt}],
             )
-            return response.content[0].text
+            text_parts = [
+                block.text for block in response.content
+                if getattr(block, "type", None) == "text"
+            ]
+            if not text_parts:
+                raise ClaudeAPIError("Claude returned no text content")
+            return "".join(text_parts)
         except RateLimitError as exc:
             if attempt == 1:
                 logger.warning("Claude rate-limited (429); waiting %ss before one retry", RATE_LIMIT_RETRY_SECONDS)
