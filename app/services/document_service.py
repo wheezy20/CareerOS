@@ -461,7 +461,7 @@ def generate_cv_docx(template_path: str, customized_bullets: list[str], output_p
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    doc = load_template_document(template_path)
+    doc = load_template_document(template_path) if template_path.lower().endswith(".docx") else Document()
     is_blank_template = len(doc.paragraphs) == 0
 
     if is_blank_template:
@@ -493,7 +493,7 @@ def generate_cover_letter(
     output = Path(output_path) if output_path else Path(f"/tmp/cover_letter_{uuid.uuid4().hex[:8]}.docx")
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    template_doc = load_template_document(template_path)
+    template_doc = load_template_document(template_path) if template_path.lower().endswith(".docx") else Document()
     template_text = load_template_text(template_path)
 
     prompt = build_cover_letter_customization_prompt(user_profile_json, parsed_job, template_text)
