@@ -13,7 +13,7 @@ from app.models import Profile, Project, Role, Skill
 from app.schemas import MatchAnalysisSchema, ParsedJobSchema
 from app.services.error_handlers import ClaudeAPIError
 
-CLAUDE_MODEL = "claude-opus-4-8"
+CLAUDE_MODEL = "claude-sonnet-5"
 
 logger = logging.getLogger(__name__)
 
