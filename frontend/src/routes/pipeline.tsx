@@ -211,6 +211,24 @@ function StepGenerate({ parsed, onBack }: { parsed: ParsedJob; onBack: () => voi
     setBusy(kind); run().finally(() => setBusy(null));
   }
 
+  function downloadFile(url: string | undefined, label: string) {
+    if (!url) {
+      toast.error(`No ${label} available yet`);
+      return;
+    }
+    try {
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      toast.error(`Couldn't download ${label}`);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-3">
@@ -234,9 +252,9 @@ function StepGenerate({ parsed, onBack }: { parsed: ParsedJob; onBack: () => voi
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-medium">CV preview</h3>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm"><RefreshCw className="h-3.5 w-3.5" />Regenerate</Button>
-              <Button variant="outline" size="sm"><Download className="h-3.5 w-3.5" />DOCX</Button>
-              <Button size="sm"><Download className="h-3.5 w-3.5" />PDF</Button>
+              <Button variant="outline" size="sm" onClick={() => gen("cv", () => api.generateCV(parsed.id).then((r) => { setCv(r); toast.success("CV ready"); }))}><RefreshCw className="h-3.5 w-3.5" />Regenerate</Button>
+              <Button variant="outline" size="sm" onClick={() => downloadFile(cv?.url, "CV (DOCX)")}><Download className="h-3.5 w-3.5" />DOCX</Button>
+              <Button size="sm" onClick={() => downloadFile(cv?.url?.replace(".docx", ".pdf"), "CV (PDF)")}><Download className="h-3.5 w-3.5" />PDF</Button>
             </div>
           </div>
           <div className="flex h-64 items-center justify-center rounded-lg bg-muted/60 text-sm text-muted-foreground">
@@ -250,9 +268,9 @@ function StepGenerate({ parsed, onBack }: { parsed: ParsedJob; onBack: () => voi
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-medium">Cover letter preview</h3>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm"><RefreshCw className="h-3.5 w-3.5" />Regenerate</Button>
-              <Button variant="outline" size="sm"><Download className="h-3.5 w-3.5" />DOCX</Button>
-              <Button size="sm"><Download className="h-3.5 w-3.5" />PDF</Button>
+              <Button variant="outline" size="sm" onClick={() => gen("cl", () => api.generateCoverLetter(parsed.id).then((r) => { setCl(r); toast.success("Cover letter ready"); }))}><RefreshCw className="h-3.5 w-3.5" />Regenerate</Button>
+              <Button variant="outline" size="sm" onClick={() => downloadFile(cl?.url, "cover letter (DOCX)")}><Download className="h-3.5 w-3.5" />DOCX</Button>
+              <Button size="sm" onClick={() => downloadFile(cl?.url?.replace(".docx", ".pdf"), "cover letter (PDF)")}><Download className="h-3.5 w-3.5" />PDF</Button>
             </div>
           </div>
           <div className="flex h-40 items-center justify-center rounded-lg bg-muted/60 text-sm text-muted-foreground">
