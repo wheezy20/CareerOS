@@ -112,14 +112,15 @@ def _resolve_template_path(template: Template | None) -> bytes:
         return b""
 
 
-def _write_temp_template(data: bytes) -> str:
+def _write_temp_template(data: bytes, filename: str = "") -> str:
     """Bridge GCS-fetched template bytes into the existing str-path-based
     docx loading pipeline (app/services/document_service.py) without
     changing that pipeline. Returns "" (meaning "no template") for empty
     bytes, matching what that pipeline already treats as "use blank"."""
     if not data:
         return ""
-    tmp = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
+    suffix = Path(filename).suffix if filename and Path(filename).suffix else ".docx"
+    tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
     try:
         tmp.write(data)
     finally:
@@ -145,8 +146,9 @@ def generate_cv(payload: dict[str, str], db: Session = Depends(get_db)) -> dict[
     template_path = ""
     try:
         customized_bullets = customize_cv_text(profile_context, parsed_job)
-        template_bytes = _resolve_template_path(_latest_template(db, "cv"))
-        template_path = _write_temp_template(template_bytes)
+        tmpl = _latest_template(db, "cv")
+        template_bytes = _resolve_template_path(tmpl)
+        template_path = _write_temp_template(template_bytes, tmpl.file_name if tmpl else "")
         generated_path = generate_cv_docx(template_path, customized_bullets, str(output_path))
     except (TemplateError, ClaudeAPIError) as exc:
         logger.warning("generate_cv hit %s; writing minimal fallback document", exc)
@@ -184,8 +186,9 @@ def generate_cover_letter_endpoint(payload: dict[str, str], db: Session = Depend
 
     template_path = ""
     try:
-        template_bytes = _resolve_template_path(_latest_template(db, "cover_letter"))
-        template_path = _write_temp_template(template_bytes)
+        tmpl = _latest_template(db, "cover_letter")
+        template_bytes = _resolve_template_path(tmpl)
+        template_path = _write_temp_template(template_bytes, tmpl.file_name if tmpl else "")
         generated_path = generate_cover_letter(profile_context, parsed_job, template_path, str(output_path))
     except (TemplateError, ClaudeAPIError) as exc:
         logger.warning("generate_cover_letter hit %s; writing minimal fallback document", exc)

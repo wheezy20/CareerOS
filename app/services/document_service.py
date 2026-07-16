@@ -18,6 +18,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches
 from docx.text.paragraph import Paragraph
+from pypdf import PdfReader
 
 from app.models import Achievement, Course, ParsedJob, Profile, Project, Role, Skill, Template
 from app.schemas import ParsedJobSchema
@@ -121,6 +122,28 @@ def load_template_document(template_path: str) -> Document:
     except TemplateError as exc:
         logger.warning("%s — using blank document fallback", exc)
         return Document()
+
+
+def _extract_text_from_pdf(path: str) -> str:
+    try:
+        reader = PdfReader(path)
+        return "\n".join(page.extract_text() or "" for page in reader.pages)
+    except Exception as exc:
+        logger.warning("Failed to extract text from PDF %r: %s", path, exc)
+        return ""
+
+
+def load_template_text(template_path: str) -> str:
+    """Return plain text from a template file regardless of source format
+    (PDF or DOCX). Never raises; returns "" for empty/missing paths."""
+    if not template_path or not Path(template_path).exists():
+        return ""
+    if template_path.lower().endswith(".pdf"):
+        return _extract_text_from_pdf(template_path)
+    template_doc = load_template_document(template_path)
+    return "\n\n".join(
+        paragraph.text.strip() for paragraph in template_doc.paragraphs if paragraph.text.strip()
+    )
 
 
 def _build_user_profile_json(
@@ -471,9 +494,7 @@ def generate_cover_letter(
     output.parent.mkdir(parents=True, exist_ok=True)
 
     template_doc = load_template_document(template_path)
-    template_text = "\n\n".join(
-        paragraph.text.strip() for paragraph in template_doc.paragraphs if paragraph.text.strip()
-    )
+    template_text = load_template_text(template_path)
 
     prompt = build_cover_letter_customization_prompt(user_profile_json, parsed_job, template_text)
     try:
