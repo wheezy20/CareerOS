@@ -493,7 +493,13 @@ function FilesTab() {
       });
       if (!res.ok) throw new Error(`Failed to get download link (${res.status})`);
       const { url } = await res.json();
-      window.open(url, "_blank", "noopener,noreferrer");
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } catch {
       toast.error(`Couldn't download ${f.name}`);
     }
