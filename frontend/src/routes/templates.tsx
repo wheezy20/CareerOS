@@ -51,7 +51,7 @@ function TemplatesPage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         <TemplateSlot label="CV Template" accept=".docx,.pdf" template={cv} onFile={(f) => upload("cv", f)} />
-        <TemplateSlot label="Cover Letter Template" accept=".docx" template={cl} onFile={(f) => upload("cover_letter", f)} />
+        <TemplateSlot label="Cover Letter Template" accept=".docx,.pdf" template={cl} onFile={(f) => upload("cover_letter", f)} />
       </div>
 
       {(cv || cl) && (
