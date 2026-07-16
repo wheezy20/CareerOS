@@ -1,3 +1,17 @@
+import os
+
+import sentry_sdk
+
+_sentry_dsn = os.environ.get("SENTRY_DSN")
+if _sentry_dsn:
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        environment=os.environ.get("SENTRY_ENVIRONMENT", "production"),
+        # Capture 100% of errors; no performance tracing to keep it free/simple
+        traces_sample_rate=0.0,
+        send_default_pii=False,
+    )
+
 from pathlib import Path
 
 from fastapi import Depends, FastAPI
