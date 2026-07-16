@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +24,7 @@ from app.schemas import (
 from app.services.storage_service import generate_signed_url, upload_bytes
 
 router = APIRouter(tags=["knowledge-base"])
+logger = logging.getLogger(__name__)
 
 ModelType = TypeVar("ModelType")
 SchemaType = TypeVar("SchemaType")
@@ -194,7 +196,10 @@ def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)) -> 
     data = file.file.read()
     suffix = Path(file.filename or "file").suffix or ".bin"
     object_path = f"files/{uuid.uuid4().hex[:8]}{suffix}"
+
+    logger.info("upload_file: uploading object_path=%s size=%d bytes", object_path, len(data))
     upload_bytes(object_path, data, content_type=file.content_type)
+    logger.info("upload_file: upload_bytes succeeded")
 
     payload = FileEntry(
         name=file.filename or "upload",
@@ -203,9 +208,20 @@ def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)) -> 
         url=object_path,
         uploaded_at=datetime.utcnow().strftime("%Y-%m-%d"),
     )
-    db.add(payload)
-    db.commit()
-    db.refresh(payload)
+    logger.info(
+        "upload_file: FileEntry payload name=%s size=%d type=%s url=%s uploaded_at=%s",
+        payload.name, payload.size, payload.type, payload.url, payload.uploaded_at,
+    )
+
+    try:
+        db.add(payload)
+        db.commit()
+        db.refresh(payload)
+        logger.info("upload_file: database commit succeeded")
+    except Exception:
+        logger.exception("upload_file: database operation failed")
+        raise
+
     return payload
 
 
