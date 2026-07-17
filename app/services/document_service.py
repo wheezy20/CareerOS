@@ -465,7 +465,7 @@ def generate_cv_structured(user_profile_json: dict, parsed_job: dict, template_t
     deterministic structure built directly from user_profile_json."""
     prompt = build_cv_structured_prompt(user_profile_json, parsed_job, template_text)
     try:
-        raw_text = call_claude(prompt, max_tokens=100000)
+        raw_text = call_claude(prompt, max_tokens=20000)
         content = _clean_json_payload(raw_text)
         data = json.loads(content)
         if not isinstance(data, dict) or not _CV_STRUCTURED_KEYS.issubset(data.keys()):
