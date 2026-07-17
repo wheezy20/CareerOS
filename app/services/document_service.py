@@ -816,6 +816,7 @@ def make_section_heading(text: str) -> list:
         name="PdfSectionHeading",
         fontName="Times-Roman",
         fontSize=13,
+        leading=16,
         spaceBefore=10,
         spaceAfter=2,
     )
@@ -832,10 +833,10 @@ def make_entry(
     subtitle_right: str,
     bullets: list[str] | None = None,
 ) -> list:
-    title_style = ParagraphStyle(name="PdfEntryTitle", fontName="Times-Bold", fontSize=11)
-    title_right_style = ParagraphStyle(name="PdfEntryTitleRight", fontName="Times-Roman", fontSize=11, alignment=TA_RIGHT)
-    subtitle_style = ParagraphStyle(name="PdfEntrySubtitle", fontName="Times-Italic", fontSize=10.5)
-    subtitle_right_style = ParagraphStyle(name="PdfEntrySubtitleRight", fontName="Times-Italic", fontSize=10.5, alignment=TA_RIGHT)
+    title_style = ParagraphStyle(name="PdfEntryTitle", fontName="Times-Bold", fontSize=11, leading=14)
+    title_right_style = ParagraphStyle(name="PdfEntryTitleRight", fontName="Times-Roman", fontSize=11, leading=14, alignment=TA_RIGHT)
+    subtitle_style = ParagraphStyle(name="PdfEntrySubtitle", fontName="Times-Italic", fontSize=10.5, leading=13)
+    subtitle_right_style = ParagraphStyle(name="PdfEntrySubtitleRight", fontName="Times-Italic", fontSize=10.5, leading=13, alignment=TA_RIGHT)
 
     table = Table(
         [
@@ -860,7 +861,7 @@ def make_entry(
     flowables: list = [table]
 
     if bullets:
-        bullet_style = ParagraphStyle(name="PdfBullet", fontName="Times-Roman", fontSize=10.5, spaceAfter=2)
+        bullet_style = ParagraphStyle(name="PdfBullet", fontName="Times-Roman", fontSize=10.5, leading=13, spaceAfter=2)
         items = [ListItem(PdfParagraph(html.escape(b), bullet_style)) for b in bullets]
         flowables.append(ListFlowable(items, bulletType="bullet", leftIndent=14))
 
@@ -880,8 +881,8 @@ def render_cv_pdf(cv: dict) -> bytes:
         rightMargin=0.5 * inch,
     )
 
-    name_style = ParagraphStyle(name="PdfName", fontName="Times-Bold", fontSize=24, alignment=TA_CENTER)
-    contact_style = ParagraphStyle(name="PdfContact", fontName="Times-Roman", fontSize=10, alignment=TA_CENTER, spaceBefore=2)
+    name_style = ParagraphStyle(name="PdfName", fontName="Times-Bold", fontSize=24, leading=28, alignment=TA_CENTER, spaceAfter=4)
+    contact_style = ParagraphStyle(name="PdfContact", fontName="Times-Roman", fontSize=10, leading=13, alignment=TA_CENTER, spaceBefore=2)
 
     story: list = [
         PdfParagraph(html.escape((cv.get("name") or "").upper()), name_style),
@@ -914,7 +915,7 @@ def render_cv_pdf(cv: dict) -> bytes:
     projects = cv.get("projects") or []
     if projects:
         story.extend(make_section_heading("Projects"))
-        project_style = ParagraphStyle(name="PdfProject", fontName="Times-Roman", fontSize=10.5, spaceAfter=4)
+        project_style = ParagraphStyle(name="PdfProject", fontName="Times-Roman", fontSize=10.5, leading=13, spaceAfter=4)
         for project in projects:
             text = f"<b>{html.escape(project.get('name', ''))}</b>: {html.escape(project.get('description', ''))}"
             story.append(PdfParagraph(text, project_style))
@@ -922,14 +923,14 @@ def render_cv_pdf(cv: dict) -> bytes:
     leadership = cv.get("leadership") or []
     if leadership:
         story.extend(make_section_heading("Others"))
-        others_style = ParagraphStyle(name="PdfOthersItem", fontName="Times-Roman", fontSize=10.5, spaceAfter=2)
+        others_style = ParagraphStyle(name="PdfOthersItem", fontName="Times-Roman", fontSize=10.5, leading=13, spaceAfter=2)
         items = [ListItem(PdfParagraph(html.escape(item), others_style)) for item in leadership]
         story.append(ListFlowable(items, bulletType="bullet", leftIndent=14))
 
     skills = cv.get("skills") or {}
     if skills:
         story.extend(make_section_heading("Skills"))
-        skill_style = ParagraphStyle(name="PdfSkill", fontName="Times-Roman", fontSize=10.5, spaceAfter=2)
+        skill_style = ParagraphStyle(name="PdfSkill", fontName="Times-Roman", fontSize=10.5, leading=13, spaceAfter=2)
         for category, skill_list in skills.items():
             text = f"<b>{html.escape(category)}</b>: {html.escape(', '.join(skill_list or []))}"
             story.append(PdfParagraph(text, skill_style))
