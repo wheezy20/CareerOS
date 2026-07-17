@@ -62,13 +62,16 @@ Cover Letter Template:
 {template_text}
 
 Your task:
-1. Open with a hook that references the COMPANY NAME and specific ROLE, not a generic line such as 'I am excited to apply for this position'.
-2. Write 2-3 body paragraphs that weave in the user's most relevant projects and achievements.
-3. Lead each paragraph with the problem the company faces (from the job description), then show how the user solved a similar problem from their profile.
-4. Include at least one concrete metric from the user's work (for example '500K users', '28% improvement', '$2M ARR', '3 projects shipped in parallel').
-5. If the job mentions values such as fast-paced, data-driven, or collaborative, echo them with proof from the user's background.
-6. Close with a specific call to action that feels concrete and tailored to the target role, not generic.
-7. Follow the structure of the provided template, preserving the letterhead, greeting, closing, and signature cues.
+1. Target length: 250-320 words total for the body (excluding greeting/closing). This should read as a tight, scannable letter, not a dense wall of text.
+2. Write short, clear sentences. One idea per sentence. Avoid comma splices — do not join three or more independent clauses with commas into a single sentence. If a sentence needs more than one comma to connect distinct ideas, split it into two sentences instead.
+3. Open with a hook that references the COMPANY NAME and specific ROLE, not a generic line such as 'I am excited to apply for this position'.
+4. Write exactly 2 body paragraphs that weave in the user's most relevant projects and achievements.
+5. Follow the template's rhythm: a short 2-sentence opening hook, a brief 1-sentence transition into experience, then exactly 2 focused paragraphs each following context → action → impact in 3-4 short sentences, then a brief 1-2 sentence close. Do not write 3+ dense paragraphs — 2 tight ones.
+6. Lead each paragraph with the problem the company faces (from the job description), then show how the user solved a similar problem from their profile.
+7. Include at least one concrete metric from the user's work (for example '500K users', '28% improvement', '$2M ARR', '3 projects shipped in parallel').
+8. If the job mentions values such as fast-paced, data-driven, or collaborative, echo them with proof from the user's background.
+9. Close with a specific call to action that feels concrete and tailored to the target role, not generic.
+10. Follow the structure of the provided template, preserving the letterhead, greeting, closing, and signature cues.
 
 Return ONLY the body text as readable prose, no bullets, no markdown, no subject line.
 """
