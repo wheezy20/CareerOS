@@ -93,6 +93,55 @@ Return ONLY the email body, no subject line, no bullets, no markdown.
 """
 
 
+CV_STRUCTURED_PROMPT = """You are an elite resume writer producing a fully structured CV as JSON.
+
+User's Profile:
+
+Roles:
+{roles}
+
+Projects:
+{projects}
+
+Courses:
+{courses}
+
+Achievements:
+{achievements}
+
+Skills:
+{skills}
+
+Target Job:
+Title: {job_title}
+Company: {job_company}
+Required Skills: {job_required_skills}
+Keywords: {job_keywords}
+Responsibilities: {job_responsibilities}
+
+Template structure (use this as your guide for section order — do not invent sections the template doesn't have, do not drop sections it does have; use empty lists for sections with no content):
+{template_text}
+
+Your task:
+1. Use the template structure above as your guide for section order — don't invent sections it doesn't have, don't drop sections it does have; use empty lists for sections with no content.
+2. Pull all real content ONLY from the User's Profile above (roles, projects, skills, courses, achievements). Never invent facts, companies, dates, or metrics.
+3. Tailor the content to the Target Job (title, required skills, keywords, responsibilities) — emphasize the most relevant roles, projects, and skills.
+4. If the Target Job's domain doesn't closely match the user's roles/projects, explicitly reframe the closest matching experience in terms of transferable skills relevant to the job, rather than forcing in an unrelated bullet.
+
+Return ONLY valid JSON (no markdown code fences, no preamble, no commentary) matching EXACTLY this shape:
+{{
+  "name": "string",
+  "contact": "string (location | phone | email | linkedin)",
+  "summary": "string, 2-4 sentences",
+  "education": [{{"school": "", "degree": "", "dates": "", "location": ""}}],
+  "skills": {{"category name": ["skill", "skill"]}},
+  "experience": [{{"role": "", "company": "", "dates": "", "location": "", "bullets": ["", ""]}}],
+  "projects": [{{"name": "", "description": ""}}],
+  "leadership": [""]
+}}
+"""
+
+
 def build_cv_customization_prompt(profile: dict, job: dict) -> str:
     return CV_CUSTOMIZATION_PROMPT.format(
         roles=json.dumps(profile.get("roles", []), indent=2),
@@ -106,6 +155,22 @@ def build_cv_customization_prompt(profile: dict, job: dict) -> str:
         job_keywords=json.dumps(job.get("keywords", [])),
         job_responsibilities=json.dumps(job.get("responsibilities", [])),
         job_years_required=job.get("yearsRequired", ""),
+    )
+
+
+def build_cv_structured_prompt(user_profile_json: dict, parsed_job: dict, template_text: str) -> str:
+    return CV_STRUCTURED_PROMPT.format(
+        roles=json.dumps(user_profile_json.get("roles", []), indent=2),
+        projects=json.dumps(user_profile_json.get("projects", []), indent=2),
+        courses=json.dumps(user_profile_json.get("courses", []), indent=2),
+        achievements=json.dumps(user_profile_json.get("achievements", []), indent=2),
+        skills=json.dumps(user_profile_json.get("skills", []), indent=2),
+        job_title=parsed_job.get("title", ""),
+        job_company=parsed_job.get("company", ""),
+        job_required_skills=json.dumps(parsed_job.get("requiredSkills", [])),
+        job_keywords=json.dumps(parsed_job.get("keywords", [])),
+        job_responsibilities=json.dumps(parsed_job.get("responsibilities", [])),
+        template_text=template_text or "No template structure provided — use a standard CV section order (summary, experience, education, skills, projects).",
     )
 
 

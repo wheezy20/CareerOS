@@ -28,6 +28,7 @@ from app.services.prompt_templates import (
     build_cover_letter_customization_prompt,
     build_cold_email_prompt,
     build_cv_customization_prompt,
+    build_cv_structured_prompt,
 )
 
 logger = logging.getLogger(__name__)
@@ -414,6 +415,65 @@ def customize_cv_text(user_profile_json: dict, parsed_job: dict) -> list[str]:
     except ClaudeAPIError as exc:
         logger.warning("customize_cv_text falling back to deterministic bullets: %s", exc)
         return _fallback_cv_bullets(user_profile_json, parsed_job)
+
+
+def _fallback_cv_structured(user_profile_json: dict) -> dict:
+    """Deterministic structured CV built straight from profile data, no Claude tailoring."""
+    profile = user_profile_json.get("profile", {}) or {}
+    contact = " | ".join(
+        part for part in (profile.get("location"), profile.get("phone"), profile.get("email"), profile.get("linkedin")) if part
+    )
+
+    skills_by_category: dict[str, list[str]] = {}
+    for skill in user_profile_json.get("skills", []):
+        category = skill.get("category") or "Skills"
+        skills_by_category.setdefault(category, []).append(skill.get("name", ""))
+
+    experience = [
+        {
+            "role": role.get("title", ""),
+            "company": role.get("company", ""),
+            "dates": f"{role.get('startDate', '')} - {role.get('endDate', '')}",
+            "location": "",
+            "bullets": role.get("achievements") or ([role["description"]] if role.get("description") else []),
+        }
+        for role in user_profile_json.get("roles", [])
+    ]
+
+    projects = [
+        {"name": project.get("title", ""), "description": project.get("description", "")}
+        for project in user_profile_json.get("projects", [])
+    ]
+
+    return {
+        "name": profile.get("name", ""),
+        "contact": contact,
+        "summary": "",
+        "education": [],
+        "skills": skills_by_category,
+        "experience": experience,
+        "projects": projects,
+        "leadership": [],
+    }
+
+
+_CV_STRUCTURED_KEYS = {"name", "contact", "summary", "education", "skills", "experience", "projects", "leadership"}
+
+
+def generate_cv_structured(user_profile_json: dict, parsed_job: dict, template_text: str) -> dict:
+    """Never raises: any Claude failure or malformed/incomplete JSON falls back to a
+    deterministic structure built directly from user_profile_json."""
+    prompt = build_cv_structured_prompt(user_profile_json, parsed_job, template_text)
+    try:
+        raw_text = call_claude(prompt, max_tokens=3000)
+        content = _clean_json_payload(raw_text)
+        data = json.loads(content)
+        if not isinstance(data, dict) or not _CV_STRUCTURED_KEYS.issubset(data.keys()):
+            raise ValueError("Claude response missing required keys")
+        return data
+    except (ClaudeAPIError, json.JSONDecodeError, ValueError, TypeError) as exc:
+        logger.warning("generate_cv_structured falling back to deterministic structure: %s", exc)
+        return _fallback_cv_structured(user_profile_json)
 
 
 def _insert_paragraph_after(paragraph: Paragraph, text: str, style: str | None = None) -> Paragraph:

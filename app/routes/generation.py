@@ -21,6 +21,8 @@ from app.services.document_service import (
     generate_cold_email,
     generate_cover_letter,
     generate_cv_docx,
+    generate_cv_structured,
+    load_template_text,
     _build_user_profile_json,
 )
 from app.services.error_handlers import ClaudeAPIError, TemplateError
@@ -170,6 +172,29 @@ def generate_cv(payload: dict[str, str], db: Session = Depends(get_db)) -> dict[
 
     version = f"v1-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
     return {"url": f"/generated/{output_name}", "version": version, "path": generated_path}
+
+
+# TEMP: remove after Stage 2 renderers ship
+@router.post("/generate/cv-structured-preview")
+def generate_cv_structured_preview(payload: dict[str, str], db: Session = Depends(get_db)) -> dict:
+    job_id = payload.get("jobId") or payload.get("job_id")
+    if not job_id:
+        raise HTTPException(status_code=400, detail="jobId is required")
+
+    job = _find_job(db, job_id)
+    profile_context = _find_profile_context(db)
+    parsed_job = ParsedJobSchema.model_validate(job).model_dump(by_alias=True)
+
+    tmpl = _latest_template(db, "cv")
+    template_bytes = _resolve_template_path(tmpl)
+    template_path = _write_temp_template(template_bytes, tmpl.file_name if tmpl else "")
+    try:
+        template_text = load_template_text(template_path)
+    finally:
+        if template_path:
+            os.unlink(template_path)
+
+    return generate_cv_structured(profile_context, parsed_job, template_text)
 
 
 @router.post("/generate/cover-letter")
