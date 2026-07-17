@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import io
 import json
 import logging
@@ -474,6 +475,183 @@ def generate_cv_structured(user_profile_json: dict, parsed_job: dict, template_t
     except (ClaudeAPIError, json.JSONDecodeError, ValueError, TypeError) as exc:
         logger.warning("generate_cv_structured falling back to deterministic structure: %s", exc)
         return _fallback_cv_structured(user_profile_json)
+
+
+def render_cv_html(cv: dict) -> str:
+    """Render a structured CV dict (the shape produced by generate_cv_structured)
+    as a single self-contained HTML string — inline <style>, no external
+    stylesheet or JS, safe to drop into dangerouslySetInnerHTML or an iframe
+    srcDoc. Every string value is html.escape'd before insertion."""
+
+    def esc(value: Any) -> str:
+        return html.escape(str(value or ""))
+
+    name = esc(cv.get("name"))
+    contact = esc(cv.get("contact"))
+    summary = esc(cv.get("summary"))
+
+    sections_html: list[str] = []
+
+    if summary:
+        sections_html.append(f"""
+        <section>
+          <h2>Summary</h2>
+          <p>{summary}</p>
+        </section>
+        """)
+
+    education = cv.get("education") or []
+    if education:
+        rows = []
+        for entry in education:
+            school = esc(entry.get("school"))
+            degree = esc(entry.get("degree"))
+            dates = esc(entry.get("dates"))
+            location = esc(entry.get("location"))
+            title = f"{degree} — {school}" if degree and school else (degree or school)
+            meta = " · ".join(part for part in (dates, location) if part)
+            rows.append(f"""
+            <div class="entry">
+              <div class="entry-header">
+                <span class="entry-title">{title}</span>
+                <span class="entry-meta">{meta}</span>
+              </div>
+            </div>
+            """)
+        sections_html.append(f"""
+        <section>
+          <h2>Education</h2>
+          {''.join(rows)}
+        </section>
+        """)
+
+    skills = cv.get("skills") or {}
+    if skills:
+        lines = []
+        for category, skill_list in skills.items():
+            cat = esc(category)
+            items = ", ".join(esc(s) for s in (skill_list or []))
+            lines.append(f'<div class="skill-line"><span class="skill-category">{cat}:</span> {items}</div>')
+        sections_html.append(f"""
+        <section>
+          <h2>Skills</h2>
+          {''.join(lines)}
+        </section>
+        """)
+
+    experience = cv.get("experience") or []
+    if experience:
+        entries = []
+        for exp in experience:
+            role = esc(exp.get("role"))
+            company = esc(exp.get("company"))
+            dates = esc(exp.get("dates"))
+            location = esc(exp.get("location"))
+            bullets = exp.get("bullets") or []
+            bullets_html = "".join(f"<li>{esc(b)}</li>" for b in bullets)
+            title = f"<strong>{role}</strong> — {company}" if role and company else f"<strong>{role or company}</strong>"
+            meta = " · ".join(part for part in (dates, location) if part)
+            entries.append(f"""
+            <div class="entry">
+              <div class="entry-header">
+                <span class="entry-title">{title}</span>
+                <span class="entry-meta">{meta}</span>
+              </div>
+              {"<ul>" + bullets_html + "</ul>" if bullets_html else ""}
+            </div>
+            """)
+        sections_html.append(f"""
+        <section>
+          <h2>Experience</h2>
+          {''.join(entries)}
+        </section>
+        """)
+
+    projects = cv.get("projects") or []
+    if projects:
+        entries = []
+        for proj in projects:
+            pname = esc(proj.get("name"))
+            desc = esc(proj.get("description"))
+            entries.append(f"""
+            <div class="entry">
+              <div class="entry-header">
+                <span class="entry-title"><strong>{pname}</strong></span>
+              </div>
+              {"<p>" + desc + "</p>" if desc else ""}
+            </div>
+            """)
+        sections_html.append(f"""
+        <section>
+          <h2>Projects</h2>
+          {''.join(entries)}
+        </section>
+        """)
+
+    leadership = cv.get("leadership") or []
+    if leadership:
+        items = "".join(f"<li>{esc(item)}</li>" for item in leadership)
+        sections_html.append(f"""
+        <section>
+          <h2>Leadership</h2>
+          <ul>{items}</ul>
+        </section>
+        """)
+
+    body = "".join(sections_html)
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body {{
+    font-family: Georgia, 'Times New Roman', serif;
+    color: #1a1a1a;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 48px 56px;
+    line-height: 1.5;
+    background: #ffffff;
+  }}
+  .header {{ text-align: center; margin-bottom: 28px; }}
+  .header h1 {{ font-size: 28px; margin: 0 0 6px; letter-spacing: 0.5px; }}
+  .header .contact {{ font-size: 13px; color: #555555; }}
+  section {{ margin-bottom: 20px; }}
+  h2 {{
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #333333;
+    border-bottom: 1px solid #cccccc;
+    padding-bottom: 4px;
+    margin-bottom: 10px;
+  }}
+  p {{ font-size: 14px; margin: 4px 0; }}
+  .entry {{ margin-bottom: 12px; }}
+  .entry-header {{
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    font-size: 14px;
+  }}
+  .entry-title {{ font-weight: 400; }}
+  .entry-meta {{ color: #666666; font-size: 12.5px; white-space: nowrap; }}
+  ul {{ margin: 6px 0 0; padding-left: 20px; }}
+  li {{ font-size: 13.5px; margin-bottom: 3px; }}
+  .skill-line {{ font-size: 13.5px; margin-bottom: 4px; }}
+  .skill-category {{ font-weight: 700; }}
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>{name}</h1>
+    <div class="contact">{contact}</div>
+  </div>
+  {body}
+</body>
+</html>"""
 
 
 def _insert_paragraph_after(paragraph: Paragraph, text: str, style: str | None = None) -> Paragraph:

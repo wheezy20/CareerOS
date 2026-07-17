@@ -23,6 +23,7 @@ from app.services.document_service import (
     generate_cv_docx,
     generate_cv_structured,
     load_template_text,
+    render_cv_html,
     _build_user_profile_json,
 )
 from app.services.error_handlers import ClaudeAPIError, TemplateError
@@ -194,7 +195,8 @@ def generate_cv_structured_preview(payload: dict[str, str], db: Session = Depend
         if template_path:
             os.unlink(template_path)
 
-    return generate_cv_structured(profile_context, parsed_job, template_text)
+    structured = generate_cv_structured(profile_context, parsed_job, template_text)
+    return {"structured": structured, "html": render_cv_html(structured)}
 
 
 @router.post("/generate/cover-letter")
