@@ -449,7 +449,6 @@ def _fallback_cv_structured(user_profile_json: dict) -> dict:
     return {
         "name": profile.get("name", ""),
         "contact": contact,
-        "summary": "",
         "education": [],
         "skills": skills_by_category,
         "experience": experience,
@@ -458,7 +457,7 @@ def _fallback_cv_structured(user_profile_json: dict) -> dict:
     }
 
 
-_CV_STRUCTURED_KEYS = {"name", "contact", "summary", "education", "skills", "experience", "projects", "leadership"}
+_CV_STRUCTURED_KEYS = {"name", "contact", "education", "skills", "experience", "projects", "leadership"}
 
 
 def generate_cv_structured(user_profile_json: dict, parsed_job: dict, template_text: str) -> dict:
@@ -488,17 +487,8 @@ def render_cv_html(cv: dict) -> str:
 
     name = esc(cv.get("name"))
     contact = esc(cv.get("contact"))
-    summary = esc(cv.get("summary"))
 
     sections_html: list[str] = []
-
-    if summary:
-        sections_html.append(f"""
-        <section>
-          <h2>Summary</h2>
-          <p>{summary}</p>
-        </section>
-        """)
 
     education = cv.get("education") or []
     if education:
@@ -508,7 +498,7 @@ def render_cv_html(cv: dict) -> str:
             degree = esc(entry.get("degree"))
             dates = esc(entry.get("dates"))
             location = esc(entry.get("location"))
-            title = f"{degree} — {school}" if degree and school else (degree or school)
+            title = f"{degree}, {school}" if degree and school else (degree or school)
             meta = " · ".join(part for part in (dates, location) if part)
             rows.append(f"""
             <div class="entry">
@@ -549,7 +539,7 @@ def render_cv_html(cv: dict) -> str:
             location = esc(exp.get("location"))
             bullets = exp.get("bullets") or []
             bullets_html = "".join(f"<li>{esc(b)}</li>" for b in bullets)
-            title = f"<strong>{role}</strong> — {company}" if role and company else f"<strong>{role or company}</strong>"
+            title = f"<strong>{role}</strong>, {company}" if role and company else f"<strong>{role or company}</strong>"
             meta = " · ".join(part for part in (dates, location) if part)
             entries.append(f"""
             <div class="entry">

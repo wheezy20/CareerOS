@@ -127,12 +127,12 @@ Your task:
 2. Pull all real content ONLY from the User's Profile above (roles, projects, skills, courses, achievements). Never invent facts, companies, dates, or metrics.
 3. Tailor the content to the Target Job (title, required skills, keywords, responsibilities) — emphasize the most relevant roles, projects, and skills.
 4. If the Target Job's domain doesn't closely match the user's roles/projects, explicitly reframe the closest matching experience in terms of transferable skills relevant to the job, rather than forcing in an unrelated bullet.
+5. Never use em dashes (—) or en dashes (–) anywhere in the output — use commas, semicolons, colons, or hyphens (-) instead.
 
 Return ONLY valid JSON (no markdown code fences, no preamble, no commentary) matching EXACTLY this shape:
 {{
   "name": "string",
   "contact": "string (location | phone | email | linkedin)",
-  "summary": "string, 2-4 sentences",
   "education": [{{"school": "", "degree": "", "dates": "", "location": ""}}],
   "skills": {{"category name": ["skill", "skill"]}},
   "experience": [{{"role": "", "company": "", "dates": "", "location": "", "bullets": ["", ""]}}],
