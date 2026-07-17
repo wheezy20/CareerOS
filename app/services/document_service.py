@@ -20,6 +20,20 @@ from docx.oxml.ns import qn
 from docx.shared import Inches, Pt
 from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
+from reportlab.lib.colors import black
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import (
+    HRFlowable,
+    ListFlowable,
+    ListItem,
+    Paragraph as PdfParagraph,
+    SimpleDocTemplate,
+    Table,
+    TableStyle,
+)
 
 from app.models import Achievement, Course, ParsedJob, Profile, Project, Role, Skill, Template
 from app.schemas import ParsedJobSchema
@@ -795,6 +809,133 @@ def render_cv_docx(cv: dict) -> Document:
             items_run.font.size = Pt(10.5)
 
     return doc
+
+
+def make_section_heading(text: str) -> list:
+    heading_style = ParagraphStyle(
+        name="PdfSectionHeading",
+        fontName="Times-Roman",
+        fontSize=13,
+        spaceBefore=10,
+        spaceAfter=2,
+    )
+    return [
+        PdfParagraph(html.escape(text.upper()), heading_style),
+        HRFlowable(width="100%", thickness=0.75, color=black, spaceAfter=6),
+    ]
+
+
+def make_entry(
+    title: str,
+    title_right: str,
+    subtitle: str,
+    subtitle_right: str,
+    bullets: list[str] | None = None,
+) -> list:
+    title_style = ParagraphStyle(name="PdfEntryTitle", fontName="Times-Bold", fontSize=11)
+    title_right_style = ParagraphStyle(name="PdfEntryTitleRight", fontName="Times-Roman", fontSize=11, alignment=TA_RIGHT)
+    subtitle_style = ParagraphStyle(name="PdfEntrySubtitle", fontName="Times-Italic", fontSize=10.5)
+    subtitle_right_style = ParagraphStyle(name="PdfEntrySubtitleRight", fontName="Times-Italic", fontSize=10.5, alignment=TA_RIGHT)
+
+    table = Table(
+        [
+            [
+                PdfParagraph(html.escape(title or ""), title_style),
+                PdfParagraph(html.escape(title_right or ""), title_right_style),
+            ],
+            [
+                PdfParagraph(html.escape(subtitle or ""), subtitle_style),
+                PdfParagraph(html.escape(subtitle_right or ""), subtitle_right_style),
+            ],
+        ],
+        colWidths=[5.5 * inch, 1.5 * inch],
+    )
+    table.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+    ]))
+
+    flowables: list = [table]
+
+    if bullets:
+        bullet_style = ParagraphStyle(name="PdfBullet", fontName="Times-Roman", fontSize=10.5, spaceAfter=2)
+        items = [ListItem(PdfParagraph(html.escape(b), bullet_style)) for b in bullets]
+        flowables.append(ListFlowable(items, bulletType="bullet", leftIndent=14))
+
+    return flowables
+
+
+def render_cv_pdf(cv: dict) -> bytes:
+    """Build a CV PDF from scratch (no template), mirroring render_cv_docx's
+    visual style. Returns raw PDF bytes."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        topMargin=0.5 * inch,
+        bottomMargin=0.5 * inch,
+        leftMargin=0.5 * inch,
+        rightMargin=0.5 * inch,
+    )
+
+    name_style = ParagraphStyle(name="PdfName", fontName="Times-Bold", fontSize=24, alignment=TA_CENTER)
+    contact_style = ParagraphStyle(name="PdfContact", fontName="Times-Roman", fontSize=10, alignment=TA_CENTER, spaceBefore=2)
+
+    story: list = [
+        PdfParagraph(html.escape((cv.get("name") or "").upper()), name_style),
+        PdfParagraph(html.escape(cv.get("contact") or ""), contact_style),
+    ]
+
+    education = cv.get("education") or []
+    if education:
+        story.extend(make_section_heading("Education"))
+        for entry in education:
+            story.extend(make_entry(
+                title=entry.get("school", ""),
+                title_right=entry.get("location", ""),
+                subtitle=entry.get("degree", ""),
+                subtitle_right=entry.get("dates", ""),
+            ))
+
+    experience = cv.get("experience") or []
+    if experience:
+        story.extend(make_section_heading("Experience"))
+        for entry in experience:
+            story.extend(make_entry(
+                title=entry.get("role", ""),
+                title_right=entry.get("dates", ""),
+                subtitle=entry.get("company", ""),
+                subtitle_right=entry.get("location", ""),
+                bullets=entry.get("bullets") or [],
+            ))
+
+    projects = cv.get("projects") or []
+    if projects:
+        story.extend(make_section_heading("Projects"))
+        project_style = ParagraphStyle(name="PdfProject", fontName="Times-Roman", fontSize=10.5, spaceAfter=4)
+        for project in projects:
+            text = f"<b>{html.escape(project.get('name', ''))}</b>: {html.escape(project.get('description', ''))}"
+            story.append(PdfParagraph(text, project_style))
+
+    leadership = cv.get("leadership") or []
+    if leadership:
+        story.extend(make_section_heading("Others"))
+        others_style = ParagraphStyle(name="PdfOthersItem", fontName="Times-Roman", fontSize=10.5, spaceAfter=2)
+        items = [ListItem(PdfParagraph(html.escape(item), others_style)) for item in leadership]
+        story.append(ListFlowable(items, bulletType="bullet", leftIndent=14))
+
+    skills = cv.get("skills") or {}
+    if skills:
+        story.extend(make_section_heading("Skills"))
+        skill_style = ParagraphStyle(name="PdfSkill", fontName="Times-Roman", fontSize=10.5, spaceAfter=2)
+        for category, skill_list in skills.items():
+            text = f"<b>{html.escape(category)}</b>: {html.escape(', '.join(skill_list or []))}"
+            story.append(PdfParagraph(text, skill_style))
+
+    doc.build(story)
+    return buffer.getvalue()
 
 
 def _insert_paragraph_after(paragraph: Paragraph, text: str, style: str | None = None) -> Paragraph:

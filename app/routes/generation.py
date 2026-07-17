@@ -25,6 +25,7 @@ from app.services.document_service import (
     load_template_text,
     render_cv_docx,
     render_cv_html,
+    render_cv_pdf,
     _build_user_profile_json,
 )
 from app.services.error_handlers import ClaudeAPIError, TemplateError
@@ -201,7 +202,15 @@ def generate_cv_structured_preview(payload: dict[str, str], db: Session = Depend
     docx_name = f"preview_{uuid.uuid4().hex[:8]}.docx"
     render_cv_docx(structured).save(str(GENERATED_DIR / docx_name))
 
-    return {"structured": structured, "html": render_cv_html(structured), "docxUrl": f"/generated/{docx_name}"}
+    pdf_name = f"preview_{uuid.uuid4().hex[:8]}.pdf"
+    (GENERATED_DIR / pdf_name).write_bytes(render_cv_pdf(structured))
+
+    return {
+        "structured": structured,
+        "html": render_cv_html(structured),
+        "docxUrl": f"/generated/{docx_name}",
+        "pdfUrl": f"/generated/{pdf_name}",
+    }
 
 
 @router.post("/generate/cover-letter")
