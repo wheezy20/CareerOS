@@ -20,14 +20,17 @@ from app.schemas import ParsedJobSchema
 from app.services.document_service import (
     generate_cold_email,
     generate_cover_letter,
+    generate_cover_letter_content,
     generate_cv_structured,
     load_template_text,
+    render_cover_letter_html,
+    render_cover_letter_pdf,
     render_cv_docx,
     render_cv_html,
     render_cv_pdf,
     _build_user_profile_json,
 )
-from app.services.error_handlers import ClaudeAPIError, TemplateError
+from app.services.error_handlers import ClaudeAPIError
 from app.services.storage_service import generate_signed_url, upload_bytes
 
 router = APIRouter(tags=["generation"])
@@ -197,7 +200,7 @@ def generate_cv(payload: dict[str, str], db: Session = Depends(get_db)) -> dict:
 
 
 @router.post("/generate/cover-letter")
-def generate_cover_letter_endpoint(payload: dict[str, str], db: Session = Depends(get_db)) -> dict[str, str]:
+def generate_cover_letter_endpoint(payload: dict[str, str], db: Session = Depends(get_db)) -> dict:
     job_id = payload.get("jobId") or payload.get("job_id")
     if not job_id:
         raise HTTPException(status_code=400, detail="jobId is required")
@@ -205,27 +208,66 @@ def generate_cover_letter_endpoint(payload: dict[str, str], db: Session = Depend
     job = _find_job(db, job_id)
     profile_context = _find_profile_context(db)
     parsed_job = ParsedJobSchema.model_validate(job).model_dump(by_alias=True)
-    output_name = f"cover-letter_{job_id}_{uuid.uuid4().hex[:8]}.docx"
-    output_path = GENERATED_DIR / output_name
 
-    template_path = ""
+    tmpl = _latest_template(db, "cover_letter")
+    template_bytes = _resolve_template_path(tmpl)
+    template_path = _write_temp_template(template_bytes, tmpl.file_name if tmpl else "")
+    docx_output_path = ""
     try:
-        tmpl = _latest_template(db, "cover_letter")
-        template_bytes = _resolve_template_path(tmpl)
-        template_path = _write_temp_template(template_bytes, tmpl.file_name if tmpl else "")
-        generated_path = generate_cover_letter(profile_context, parsed_job, template_path, str(output_path))
-    except (TemplateError, ClaudeAPIError) as exc:
-        logger.warning("generate_cover_letter hit %s; writing minimal fallback document", exc)
-        generated_path = _write_minimal_fallback_docx(_FALLBACK_LETTER_TEXT, output_path)
-    except Exception as exc:
-        logger.error("generate_cover_letter unexpected failure: %s; writing minimal fallback document", exc)
-        generated_path = _write_minimal_fallback_docx(_FALLBACK_LETTER_TEXT, output_path)
+        template_text = load_template_text(template_path)
+        content = generate_cover_letter_content(profile_context, parsed_job, template_text)
+
+        profile = profile_context.get("profile", {})
+        contact = " | ".join(
+            part for part in (
+                profile.get("location"),
+                profile.get("phone"),
+                profile.get("email"),
+                profile.get("linkedin"),
+                profile.get("portfolio"),
+                profile.get("github"),
+            ) if part
+        )
+
+        cl_html = render_cover_letter_html(profile.get("name", ""), contact, content)
+
+        docx_tmp = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
+        docx_tmp.close()
+        docx_output_path = docx_tmp.name
+        generate_cover_letter(profile_context, parsed_job, template_path, content, docx_output_path)
+        docx_bytes = Path(docx_output_path).read_bytes()
     finally:
         if template_path:
             os.unlink(template_path)
+        if docx_output_path and os.path.exists(docx_output_path):
+            os.unlink(docx_output_path)
 
-    version = f"v1-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
-    return {"url": f"/generated/{output_name}", "version": version, "path": generated_path}
+    pdf_bytes = render_cover_letter_pdf(profile.get("name", ""), contact, content)
+
+    docx_url = None
+    try:
+        docx_object_path = f"generated/cover-letter_{job_id}_{uuid.uuid4().hex[:8]}.docx"
+        upload_bytes(docx_object_path, docx_bytes)
+        docx_url = generate_signed_url(docx_object_path)
+    except Exception as exc:
+        logger.warning("Failed to upload/sign generated cover letter docx: %s", exc)
+        docx_url = None
+
+    pdf_url = None
+    try:
+        pdf_object_path = f"generated/cover-letter_{job_id}_{uuid.uuid4().hex[:8]}.pdf"
+        upload_bytes(pdf_object_path, pdf_bytes)
+        pdf_url = generate_signed_url(pdf_object_path)
+    except Exception as exc:
+        logger.warning("Failed to upload/sign generated cover letter pdf: %s", exc)
+        pdf_url = None
+
+    return {
+        "html": cl_html,
+        "docxUrl": docx_url,
+        "pdfUrl": pdf_url,
+        "version": f"v2-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}",
+    }
 
 
 @router.post("/generate/cold-email")

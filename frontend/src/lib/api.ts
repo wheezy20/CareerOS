@@ -182,8 +182,10 @@ export const api = {
       ? delay({ html: "<p>Mock CV preview</p>", docxUrl: null, pdfUrl: null, version: `v${Math.floor(Math.random() * 90) + 10}` }, 1400)
       : fetchJson("POST", "/generate/cv", { jobId });
   },
-  async generateCoverLetter(jobId: string): Promise<{ url: string }> {
-    return USE_MOCKS ? delay({ url: "#" }, 1200) : fetchJson("POST", "/generate/cover-letter", { jobId });
+  async generateCoverLetter(jobId: string): Promise<{ html: string; docxUrl: string | null; pdfUrl: string | null; version: string }> {
+    return USE_MOCKS
+      ? delay({ html: "<p>Mock cover letter preview</p>", docxUrl: null, pdfUrl: null, version: `v${Math.floor(Math.random() * 90) + 10}` }, 1200)
+      : fetchJson("POST", "/generate/cover-letter", { jobId });
   },
   async generateColdEmail(jobId: string): Promise<{ text: string }> {
     if (USE_MOCKS) {

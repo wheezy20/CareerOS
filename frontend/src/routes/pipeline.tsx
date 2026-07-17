@@ -203,7 +203,7 @@ function StepReview({ parsed, match, onNext, onBack }: {
 
 function StepGenerate({ parsed, onBack }: { parsed: ParsedJob; onBack: () => void }) {
   const [cv, setCv] = useState<{ html: string; docxUrl: string | null; pdfUrl: string | null; version: string } | null>(null);
-  const [cl, setCl] = useState<{ url: string } | null>(null);
+  const [cl, setCl] = useState<{ html: string; docxUrl: string | null; pdfUrl: string | null; version: string } | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -267,13 +267,11 @@ function StepGenerate({ parsed, onBack }: { parsed: ParsedJob; onBack: () => voi
             <h3 className="font-medium">Cover letter preview</h3>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => gen("cl", () => api.generateCoverLetter(parsed.id).then((r) => { setCl(r); toast.success("Cover letter ready"); }))}><RefreshCw className="h-3.5 w-3.5" />Regenerate</Button>
-              <Button variant="outline" size="sm" onClick={() => downloadFile(cl?.url, "cover letter (DOCX)")}><Download className="h-3.5 w-3.5" />DOCX</Button>
-              <Button size="sm" onClick={() => downloadFile(cl?.url?.replace(".docx", ".pdf"), "cover letter (PDF)")}><Download className="h-3.5 w-3.5" />PDF</Button>
+              <Button variant="outline" size="sm" onClick={() => downloadFile(cl?.docxUrl ?? undefined, "cover letter (DOCX)")}><Download className="h-3.5 w-3.5" />DOCX</Button>
+              <Button size="sm" onClick={() => downloadFile(cl?.pdfUrl ?? undefined, "cover letter (PDF)")}><Download className="h-3.5 w-3.5" />PDF</Button>
             </div>
           </div>
-          <div className="flex h-40 items-center justify-center rounded-lg bg-muted/60 text-sm text-muted-foreground">
-            [ Cover letter preview ]
-          </div>
+          <iframe srcDoc={cl.html} style={{ width: "100%", height: "550px", border: "none" }} title="Cover letter preview" />
         </CardContent></Card>
       )}
 

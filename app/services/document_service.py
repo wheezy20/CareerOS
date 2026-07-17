@@ -667,6 +667,53 @@ def render_cv_html(cv: dict) -> str:
 </html>"""
 
 
+def render_cover_letter_html(name: str, contact: str, content: str) -> str:
+    """Render a cover letter as a single self-contained HTML string, reusing
+    render_cv_html's visual style for header/typography consistency between
+    the CV and cover letter previews. Every string value is html.escape'd."""
+
+    def esc(value: Any) -> str:
+        return html.escape(str(value or ""))
+
+    escaped_name = esc(name)
+    escaped_contact = esc(contact)
+
+    body_paragraphs = "".join(
+        f"<p>{esc(part.strip())}</p>" for part in (content or "").split("\n\n") if part.strip()
+    )
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body {{
+    font-family: Georgia, 'Times New Roman', serif;
+    color: #1a1a1a;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 48px 56px;
+    line-height: 1.5;
+    background: #ffffff;
+  }}
+  .header {{ text-align: center; margin-bottom: 28px; }}
+  .header h1 {{ font-size: 28px; margin: 0 0 6px; letter-spacing: 0.5px; }}
+  .header .contact {{ font-size: 13px; color: #555555; }}
+  p {{ font-size: 14px; margin: 4px 0 14px; }}
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>{escaped_name}</h1>
+    <div class="contact">{escaped_contact}</div>
+  </div>
+  <p>Dear Hiring Manager,</p>
+  {body_paragraphs}
+  <p>Sincerely,<br>{escaped_name}</p>
+</body>
+</html>"""
+
+
 def add_section_heading(doc: Document, text: str) -> None:
     paragraph = doc.add_paragraph()
     run = paragraph.add_run(text)
@@ -939,6 +986,42 @@ def render_cv_pdf(cv: dict) -> bytes:
     return buffer.getvalue()
 
 
+def render_cover_letter_pdf(name: str, contact: str, content: str) -> bytes:
+    """Build a cover letter PDF from scratch, mirroring render_cv_pdf's header
+    styling for consistency. Returns raw PDF bytes."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        topMargin=0.5 * inch,
+        bottomMargin=0.5 * inch,
+        leftMargin=0.5 * inch,
+        rightMargin=0.5 * inch,
+    )
+
+    name_style = ParagraphStyle(name="PdfLetterName", fontName="Times-Bold", fontSize=24, leading=28, alignment=TA_CENTER, spaceAfter=4)
+    contact_style = ParagraphStyle(name="PdfLetterContact", fontName="Times-Roman", fontSize=10, leading=13, alignment=TA_CENTER, spaceBefore=2)
+    body_style = ParagraphStyle(name="PdfLetterBody", fontName="Times-Roman", fontSize=11, leading=15, spaceAfter=12)
+
+    escaped_name = html.escape((name or "").upper())
+
+    story: list = [
+        PdfParagraph(escaped_name, name_style),
+        PdfParagraph(html.escape(contact or ""), contact_style),
+        PdfParagraph("Dear Hiring Manager,", body_style),
+    ]
+
+    for part in (content or "").split("\n\n"):
+        stripped = part.strip()
+        if stripped:
+            story.append(PdfParagraph(html.escape(stripped), body_style))
+
+    story.append(PdfParagraph(f"Sincerely,<br/>{escaped_name}", body_style))
+
+    doc.build(story)
+    return buffer.getvalue()
+
+
 def _insert_paragraph_after(paragraph: Paragraph, text: str, style: str | None = None) -> Paragraph:
     new_element = OxmlElement("w:p")
     paragraph._p.addnext(new_element)
@@ -1007,25 +1090,29 @@ def generate_cv_docx(template_path: str, customized_bullets: list[str], output_p
     return str(output)
 
 
+def generate_cover_letter_content(user_profile_json: dict, parsed_job: dict, template_text: str) -> str:
+    """Never raises: falls back to _build_fallback_cover_letter on any Claude failure.
+    Returns the cleaned letter body text (the part that goes between salutation and closing)."""
+    prompt = build_cover_letter_customization_prompt(user_profile_json, parsed_job, template_text)
+    try:
+        raw_text = call_claude(prompt, max_tokens=1800)
+        return _clean_text_payload(raw_text)
+    except ClaudeAPIError as exc:
+        logger.warning("generate_cover_letter_content falling back to deterministic letter: %s", exc)
+        return _build_fallback_cover_letter(user_profile_json, parsed_job)
+
+
 def generate_cover_letter(
     user_profile_json: dict,
     parsed_job: dict,
     template_path: str,
+    content: str,
     output_path: str | None = None,
 ) -> str:
     output = Path(output_path) if output_path else Path(f"/tmp/cover_letter_{uuid.uuid4().hex[:8]}.docx")
     output.parent.mkdir(parents=True, exist_ok=True)
 
     template_doc = load_template_document(template_path) if template_path.lower().endswith(".docx") else Document()
-    template_text = load_template_text(template_path)
-
-    prompt = build_cover_letter_customization_prompt(user_profile_json, parsed_job, template_text)
-    try:
-        raw_text = call_claude(prompt, max_tokens=1800)
-        content = _clean_text_payload(raw_text)
-    except ClaudeAPIError as exc:
-        logger.warning("generate_cover_letter falling back to deterministic letter: %s", exc)
-        content = _build_fallback_cover_letter(user_profile_json, parsed_job)
 
     paragraphs = list(template_doc.paragraphs)
     if not paragraphs:
