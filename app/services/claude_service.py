@@ -201,7 +201,7 @@ Job Description:
 {job_text}
 """
     try:
-        raw_text = call_claude(prompt, max_tokens=1200)
+        raw_text = call_claude(prompt, max_tokens=8000)
         content = _clean_json_payload(raw_text)
         data = json.loads(content)
         return ParsedJobSchema(**data)
@@ -243,7 +243,7 @@ Return ONLY valid JSON matching this shape:
 }}
 """
     try:
-        raw_text = call_claude(prompt, max_tokens=1000)
+        raw_text = call_claude(prompt, max_tokens=3000)
         content = _clean_json_payload(raw_text)
         data = json.loads(content)
         return MatchAnalysisSchema(**data)

@@ -956,7 +956,7 @@ def generate_cover_letter_content(user_profile_json: dict, parsed_job: dict, tem
     Returns the cleaned letter body text (the part that goes between salutation and closing)."""
     prompt = build_cover_letter_customization_prompt(user_profile_json, parsed_job, template_text)
     try:
-        raw_text = call_claude(prompt, max_tokens=1800)
+        raw_text = call_claude(prompt, max_tokens=6000)
         return _clean_text_payload(raw_text)
     except ClaudeAPIError as exc:
         logger.warning("generate_cover_letter_content falling back to deterministic letter: %s", exc)
@@ -1016,7 +1016,7 @@ def generate_cold_email(user_profile_json: dict, parsed_job: dict) -> str:
     """Never raises: any Claude failure falls back to a deterministic, personalized email."""
     prompt = build_cold_email_prompt(user_profile_json, parsed_job)
     try:
-        raw_text = call_claude(prompt, max_tokens=800)
+        raw_text = call_claude(prompt, max_tokens=3000)
         text = _clean_text_payload(raw_text)
         if text.startswith("Subject:"):
             text = "\n".join(text.splitlines()[1:]) if len(text.splitlines()) > 1 else ""
