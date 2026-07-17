@@ -1,6 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
+import { api } from "@/lib/api";
+import type { AuthUser } from "@/lib/types";
 import { BookOpen, FileText, Sparkles, Briefcase, BarChart3, Settings, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -17,10 +20,16 @@ const sections = [
 ] as const;
 
 function Home() {
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    api.getMe().then(setUser).catch(() => setUser(null));
+  }, []);
+
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
-        title="Welcome back, Eyram"
+        title={`Welcome back${user?.login ? `, ${user.login}` : ""}`}
         description="Your personal job application copilot. Start from your knowledge base or drop a new job description."
       />
 

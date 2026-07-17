@@ -36,7 +36,6 @@ app.add_middleware(
         "http://localhost:8080",
         "http://localhost:5173",
         "https://career-os-seven-eta.vercel.app",
-        "https://careeros-production-ecef.up.railway.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
