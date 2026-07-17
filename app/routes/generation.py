@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import logging
 import os
 import tempfile
@@ -17,10 +18,8 @@ from app.database import get_db
 from app.models import Achievement, Course, GeneratedCv, ParsedJob, Profile, Project, Role, Skill, Template
 from app.schemas import ParsedJobSchema
 from app.services.document_service import (
-    customize_cv_text,
     generate_cold_email,
     generate_cover_letter,
-    generate_cv_docx,
     generate_cv_structured,
     load_template_text,
     render_cv_docx,
@@ -29,6 +28,7 @@ from app.services.document_service import (
     _build_user_profile_json,
 )
 from app.services.error_handlers import ClaudeAPIError, TemplateError
+from app.services.storage_service import generate_signed_url, upload_bytes
 
 router = APIRouter(tags=["generation"])
 
@@ -134,52 +134,7 @@ def _write_temp_template(data: bytes, filename: str = "") -> str:
 
 
 @router.post("/generate/cv")
-def generate_cv(payload: dict[str, str], db: Session = Depends(get_db)) -> dict[str, str]:
-    job_id = payload.get("jobId") or payload.get("job_id")
-    if not job_id:
-        raise HTTPException(status_code=400, detail="jobId is required")
-
-    job = _find_job(db, job_id)
-    profile_context = _find_profile_context(db)
-    parsed_job = ParsedJobSchema.model_validate(job).model_dump(by_alias=True)
-    output_name = f"cv_{job_id}_{uuid.uuid4().hex[:8]}.docx"
-    output_path = GENERATED_DIR / output_name
-
-    # customize_cv_text / generate_cv_docx already convert Claude/template failures
-    # into deterministic fallbacks internally and don't raise — this is a second,
-    # redundant safety net so this route can never return a 5xx either way.
-    template_path = ""
-    try:
-        customized_bullets = customize_cv_text(profile_context, parsed_job)
-        tmpl = _latest_template(db, "cv")
-        template_bytes = _resolve_template_path(tmpl)
-        template_path = _write_temp_template(template_bytes, tmpl.file_name if tmpl else "")
-        generated_path = generate_cv_docx(template_path, customized_bullets, str(output_path))
-    except (TemplateError, ClaudeAPIError) as exc:
-        logger.warning("generate_cv hit %s; writing minimal fallback document", exc)
-        generated_path = _write_minimal_fallback_docx("\n".join(_FALLBACK_BULLETS), output_path)
-    except Exception as exc:
-        logger.error("generate_cv unexpected failure: %s; writing minimal fallback document", exc)
-        generated_path = _write_minimal_fallback_docx("\n".join(_FALLBACK_BULLETS), output_path)
-    finally:
-        if template_path:
-            os.unlink(template_path)
-
-    project_ids = [project.id for project in db.query(Project).all()]
-    db.add(GeneratedCv(
-        job_id=job_id,
-        project_ids=project_ids,
-        generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-    ))
-    db.commit()
-
-    version = f"v1-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
-    return {"url": f"/generated/{output_name}", "version": version, "path": generated_path}
-
-
-# TEMP: remove after Stage 2 renderers ship
-@router.post("/generate/cv-structured-preview")
-def generate_cv_structured_preview(payload: dict[str, str], db: Session = Depends(get_db)) -> dict:
+def generate_cv(payload: dict[str, str], db: Session = Depends(get_db)) -> dict:
     job_id = payload.get("jobId") or payload.get("job_id")
     if not job_id:
         raise HTTPException(status_code=400, detail="jobId is required")
@@ -198,18 +153,46 @@ def generate_cv_structured_preview(payload: dict[str, str], db: Session = Depend
             os.unlink(template_path)
 
     structured = generate_cv_structured(profile_context, parsed_job, template_text)
+    cv_html = render_cv_html(structured)
 
-    docx_name = f"preview_{uuid.uuid4().hex[:8]}.docx"
-    render_cv_docx(structured).save(str(GENERATED_DIR / docx_name))
+    docx_buffer = io.BytesIO()
+    render_cv_docx(structured).save(docx_buffer)
+    docx_buffer.seek(0)
+    docx_bytes = docx_buffer.read()
 
-    pdf_name = f"preview_{uuid.uuid4().hex[:8]}.pdf"
-    (GENERATED_DIR / pdf_name).write_bytes(render_cv_pdf(structured))
+    pdf_bytes = render_cv_pdf(structured)
+
+    docx_url = None
+    try:
+        docx_object_path = f"generated/cv_{job_id}_{uuid.uuid4().hex[:8]}.docx"
+        upload_bytes(docx_object_path, docx_bytes)
+        docx_url = generate_signed_url(docx_object_path)
+    except Exception as exc:
+        logger.warning("Failed to upload/sign generated CV docx: %s", exc)
+        docx_url = None
+
+    pdf_url = None
+    try:
+        pdf_object_path = f"generated/cv_{job_id}_{uuid.uuid4().hex[:8]}.pdf"
+        upload_bytes(pdf_object_path, pdf_bytes)
+        pdf_url = generate_signed_url(pdf_object_path)
+    except Exception as exc:
+        logger.warning("Failed to upload/sign generated CV pdf: %s", exc)
+        pdf_url = None
+
+    project_ids = [project.id for project in db.query(Project).all()]
+    db.add(GeneratedCv(
+        job_id=job_id,
+        project_ids=project_ids,
+        generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+    ))
+    db.commit()
 
     return {
-        "structured": structured,
-        "html": render_cv_html(structured),
-        "docxUrl": f"/generated/{docx_name}",
-        "pdfUrl": f"/generated/{pdf_name}",
+        "html": cv_html,
+        "docxUrl": docx_url,
+        "pdfUrl": pdf_url,
+        "version": f"v2-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}",
     }
 
 
