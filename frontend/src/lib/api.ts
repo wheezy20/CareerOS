@@ -177,9 +177,9 @@ export const api = {
     return USE_MOCKS ? delay(mock.mockMatch, 600) : fetchJson("POST", `/job/${jobId}/analyze`);
   },
 
-  async generateCV(jobId: string): Promise<{ url: string; version: string }> {
+  async generateCV(jobId: string): Promise<{ html: string; docxUrl: string | null; pdfUrl: string | null; version: string }> {
     return USE_MOCKS
-      ? delay({ url: "#", version: `v${Math.floor(Math.random() * 90) + 10}` }, 1400)
+      ? delay({ html: "<p>Mock CV preview</p>", docxUrl: null, pdfUrl: null, version: `v${Math.floor(Math.random() * 90) + 10}` }, 1400)
       : fetchJson("POST", "/generate/cv", { jobId });
   },
   async generateCoverLetter(jobId: string): Promise<{ url: string }> {

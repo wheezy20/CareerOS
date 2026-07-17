@@ -202,7 +202,7 @@ function StepReview({ parsed, match, onNext, onBack }: {
 }
 
 function StepGenerate({ parsed, onBack }: { parsed: ParsedJob; onBack: () => void }) {
-  const [cv, setCv] = useState<{ url: string; version: string } | null>(null);
+  const [cv, setCv] = useState<{ html: string; docxUrl: string | null; pdfUrl: string | null; version: string } | null>(null);
   const [cl, setCl] = useState<{ url: string } | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -253,13 +253,11 @@ function StepGenerate({ parsed, onBack }: { parsed: ParsedJob; onBack: () => voi
             <h3 className="font-medium">CV preview</h3>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => gen("cv", () => api.generateCV(parsed.id).then((r) => { setCv(r); toast.success("CV ready"); }))}><RefreshCw className="h-3.5 w-3.5" />Regenerate</Button>
-              <Button variant="outline" size="sm" onClick={() => downloadFile(cv?.url, "CV (DOCX)")}><Download className="h-3.5 w-3.5" />DOCX</Button>
-              <Button size="sm" onClick={() => downloadFile(cv?.url?.replace(".docx", ".pdf"), "CV (PDF)")}><Download className="h-3.5 w-3.5" />PDF</Button>
+              <Button variant="outline" size="sm" onClick={() => downloadFile(cv?.docxUrl ?? undefined, "CV (DOCX)")}><Download className="h-3.5 w-3.5" />DOCX</Button>
+              <Button size="sm" onClick={() => downloadFile(cv?.pdfUrl ?? undefined, "CV (PDF)")}><Download className="h-3.5 w-3.5" />PDF</Button>
             </div>
           </div>
-          <div className="flex h-64 items-center justify-center rounded-lg bg-muted/60 text-sm text-muted-foreground">
-            [ DOCX preview — {cv.version} ]
-          </div>
+          <iframe srcDoc={cv.html} style={{ width: "100%", height: "800px", border: "none" }} title="CV preview" />
         </CardContent></Card>
       )}
 
