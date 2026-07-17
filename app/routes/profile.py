@@ -16,7 +16,7 @@ def get_profile(db: Session = Depends(get_db)) -> Profile:
     if profile is None:
         # No row yet (fresh install / first run) — hand back an empty, unsaved
         # profile instead of 404ing, so the frontend can render the form.
-        return Profile(id="me", name="", email="", phone="", linkedin="", location="", avatar_url=None)
+        return Profile(id="me", name="", email="", phone="", linkedin="", portfolio_url="", github_url="", location="", avatar_url=None)
     return profile
 
 

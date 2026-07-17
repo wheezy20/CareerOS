@@ -20,7 +20,7 @@ export const Route = createFileRoute("/settings")({
   }),
 });
 
-const EMPTY_PROFILE: ProfileInfo = { name: "", email: "", phone: "", linkedin: "", location: "" };
+const EMPTY_PROFILE: ProfileInfo = { name: "", email: "", phone: "", linkedin: "", portfolioUrl: "", githubUrl: "", location: "" };
 
 function SettingsPage() {
   const [p, setP] = useState<ProfileInfo | null>(null);
@@ -46,6 +46,12 @@ function SettingsPage() {
           <Field label="Location" placeholder="e.g. Accra, Ghana" value={p.location} onChange={(v) => setP({ ...p, location: v })} />
           <div className="md:col-span-2">
             <Field label="LinkedIn" placeholder="https://linkedin.com/in/yourname" value={p.linkedin} onChange={(v) => setP({ ...p, linkedin: v })} />
+          </div>
+          <div className="md:col-span-2">
+            <Field label="Portfolio" placeholder="https://yourname.dev" value={p.portfolioUrl} onChange={(v) => setP({ ...p, portfolioUrl: v })} />
+          </div>
+          <div className="md:col-span-2">
+            <Field label="GitHub" placeholder="https://github.com/yourname" value={p.githubUrl} onChange={(v) => setP({ ...p, githubUrl: v })} />
           </div>
         </div>
         <div className="mt-4 flex justify-end">

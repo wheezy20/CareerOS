@@ -137,6 +137,8 @@ class Profile(Base):
     email = Column(String, nullable=False, default="")
     phone = Column(String, nullable=False, default="")
     linkedin = Column(String, nullable=False, default="")
+    portfolio_url = Column(String, nullable=False, default="")
+    github_url = Column(String, nullable=False, default="")
     location = Column(String, nullable=False, default="")
     avatar_url = Column(String, nullable=True)
 

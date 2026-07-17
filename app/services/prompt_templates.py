@@ -97,6 +97,9 @@ CV_STRUCTURED_PROMPT = """You are an elite resume writer producing a fully struc
 
 User's Profile:
 
+Contact Info (the ONLY source of truth for the "name" and "contact" fields):
+{profile_contact}
+
 Roles:
 {roles}
 
@@ -128,11 +131,14 @@ Your task:
 3. Tailor the content to the Target Job (title, required skills, keywords, responsibilities) — emphasize the most relevant roles, projects, and skills.
 4. If the Target Job's domain doesn't closely match the user's roles/projects, explicitly reframe the closest matching experience in terms of transferable skills relevant to the job, rather than forcing in an unrelated bullet.
 5. Never use em dashes (—) or en dashes (–) anywhere in the output — use commas, semicolons, colons, or hyphens (-) instead.
+6. Build the "contact" field ONLY from the Contact Info block above (location, phone, email, linkedin, portfolio, github), pipe-separated (" | "), omitting any field that is empty. Do NOT pull contact details from the template structure, even if it shows different or additional contact information — the template is a structural guide only, never a source of facts.
+
+The "leadership" field covers: volunteering, summits/conferences attended or presented at, poster presentations, awards and achievements, and certifications.
 
 Return ONLY valid JSON (no markdown code fences, no preamble, no commentary) matching EXACTLY this shape:
 {{
   "name": "string",
-  "contact": "string (location | phone | email | linkedin)",
+  "contact": "string (location | phone | email | linkedin | portfolio | github, omitting empty fields)",
   "education": [{{"school": "", "degree": "", "dates": "", "location": ""}}],
   "skills": {{"category name": ["skill", "skill"]}},
   "experience": [{{"role": "", "company": "", "dates": "", "location": "", "bullets": ["", ""]}}],
@@ -160,6 +166,7 @@ def build_cv_customization_prompt(profile: dict, job: dict) -> str:
 
 def build_cv_structured_prompt(user_profile_json: dict, parsed_job: dict, template_text: str) -> str:
     return CV_STRUCTURED_PROMPT.format(
+        profile_contact=json.dumps(user_profile_json.get("profile", {}), indent=2),
         roles=json.dumps(user_profile_json.get("roles", []), indent=2),
         projects=json.dumps(user_profile_json.get("projects", []), indent=2),
         courses=json.dumps(user_profile_json.get("courses", []), indent=2),

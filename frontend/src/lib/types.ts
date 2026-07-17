@@ -121,6 +121,8 @@ export type ProfileInfo = {
   email: string;
   phone: string;
   linkedin: string;
+  portfolioUrl: string;
+  githubUrl: string;
   location: string;
   avatarUrl?: string;
 };

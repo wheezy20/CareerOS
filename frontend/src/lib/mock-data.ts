@@ -9,6 +9,8 @@ export const mockProfile: ProfileInfo = {
   email: "eyram@example.com",
   phone: "+1 555 0100",
   linkedin: "https://linkedin.com/in/eyram",
+  portfolioUrl: "https://eyram.dev",
+  githubUrl: "https://github.com/eyram",
   location: "Remote · Worldwide",
 };
 

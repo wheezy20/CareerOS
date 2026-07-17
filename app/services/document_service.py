@@ -162,6 +162,8 @@ def _build_user_profile_json(
             "email": profile.email if profile else "",
             "phone": profile.phone if profile else "",
             "linkedin": profile.linkedin if profile else "",
+            "portfolio": profile.portfolio_url if profile else "",
+            "github": profile.github_url if profile else "",
             "location": profile.location if profile else "",
         },
         "roles": [
@@ -422,7 +424,14 @@ def _fallback_cv_structured(user_profile_json: dict) -> dict:
     """Deterministic structured CV built straight from profile data, no Claude tailoring."""
     profile = user_profile_json.get("profile", {}) or {}
     contact = " | ".join(
-        part for part in (profile.get("location"), profile.get("phone"), profile.get("email"), profile.get("linkedin")) if part
+        part for part in (
+            profile.get("location"),
+            profile.get("phone"),
+            profile.get("email"),
+            profile.get("linkedin"),
+            profile.get("portfolio"),
+            profile.get("github"),
+        ) if part
     )
 
     skills_by_category: dict[str, list[str]] = {}
@@ -515,20 +524,6 @@ def render_cv_html(cv: dict) -> str:
         </section>
         """)
 
-    skills = cv.get("skills") or {}
-    if skills:
-        lines = []
-        for category, skill_list in skills.items():
-            cat = esc(category)
-            items = ", ".join(esc(s) for s in (skill_list or []))
-            lines.append(f'<div class="skill-line"><span class="skill-category">{cat}:</span> {items}</div>')
-        sections_html.append(f"""
-        <section>
-          <h2>Skills</h2>
-          {''.join(lines)}
-        </section>
-        """)
-
     experience = cv.get("experience") or []
     if experience:
         entries = []
@@ -583,8 +578,22 @@ def render_cv_html(cv: dict) -> str:
         items = "".join(f"<li>{esc(item)}</li>" for item in leadership)
         sections_html.append(f"""
         <section>
-          <h2>Leadership</h2>
+          <h2>Others</h2>
           <ul>{items}</ul>
+        </section>
+        """)
+
+    skills = cv.get("skills") or {}
+    if skills:
+        lines = []
+        for category, skill_list in skills.items():
+            cat = esc(category)
+            items = ", ".join(esc(s) for s in (skill_list or []))
+            lines.append(f'<div class="skill-line"><span class="skill-category">{cat}:</span> {items}</div>')
+        sections_html.append(f"""
+        <section>
+          <h2>Skills</h2>
+          {''.join(lines)}
         </section>
         """)
 

@@ -108,6 +108,8 @@ class ProfileSchema(CamelModel):
     email: str
     phone: str
     linkedin: str
+    portfolio_url: str
+    github_url: str
     location: str
     avatar_url: Optional[str] = None
 
