@@ -87,15 +87,34 @@ function Stepper({ step }: { step: Step }) {
 function StepInput({ onParsed }: { onParsed: (p: ParsedJob) => void }) {
   const [loading, setLoading] = useState(false);
   const [url, setUrl] = useState(""); const [text, setText] = useState("");
+  const [activeTab, setActiveTab] = useState("paste");
 
   function handle(promise: Promise<ParsedJob>) {
     setLoading(true);
-    promise.then((p) => { toast.success("Job parsed"); onParsed(p); }).finally(() => setLoading(false));
+    promise
+      .then((p) => { toast.success("Job parsed"); onParsed(p); })
+      .catch((err) => {
+        const message = err?.message || "Couldn't parse that job";
+        toast.error(message);
+      })
+      .finally(() => setLoading(false));
+  }
+
+  function handleUrlParse() {
+    if (!url) return;
+    setLoading(true);
+    api.parseJobFromURL(url)
+      .then((p) => { toast.success("Job parsed"); onParsed(p); })
+      .catch(() => {
+        toast.error("Couldn't fetch that URL — paste the job description instead");
+        setActiveTab("paste");
+      })
+      .finally(() => setLoading(false));
   }
 
   return (
     <Card><CardContent className="p-6">
-      <Tabs defaultValue="paste">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="upload"><Upload className="mr-1.5 h-3.5 w-3.5" />Upload PDF</TabsTrigger>
           <TabsTrigger value="link"><LinkIcon className="mr-1.5 h-3.5 w-3.5" />Paste link</TabsTrigger>
@@ -110,7 +129,7 @@ function StepInput({ onParsed }: { onParsed: (p: ParsedJob) => void }) {
         </TabsContent>
         <TabsContent value="link" className="pt-4 space-y-3">
           <Input placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} />
-          <Button onClick={() => url && handle(api.parseJobFromURL(url))} disabled={!url || loading}>
+          <Button onClick={handleUrlParse} disabled={!url || loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             Fetch & parse
           </Button>
