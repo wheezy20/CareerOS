@@ -14,10 +14,10 @@ import httpx
 import pdfplumber
 from bs4 import BeautifulSoup
 from docx import Document
-from docx.enum.text import WD_BREAK
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Inches
+from docx.shared import Inches, Pt
 from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 
@@ -651,6 +651,150 @@ def render_cv_html(cv: dict) -> str:
   {body}
 </body>
 </html>"""
+
+
+def add_section_heading(doc: Document, text: str) -> None:
+    paragraph = doc.add_paragraph()
+    run = paragraph.add_run(text)
+    run.font.small_caps = True
+    run.font.size = Pt(13)
+    paragraph.paragraph_format.space_before = Pt(10)
+    paragraph.paragraph_format.space_after = Pt(2)
+
+    p_pr = paragraph._p.get_or_add_pPr()
+    p_bdr = OxmlElement("w:pBdr")
+    bottom = OxmlElement("w:bottom")
+    bottom.set(qn("w:val"), "single")
+    bottom.set(qn("w:sz"), "6")
+    bottom.set(qn("w:space"), "1")
+    bottom.set(qn("w:color"), "000000")
+    p_bdr.append(bottom)
+    p_pr.append(p_bdr)
+
+
+def add_entry(
+    doc: Document,
+    title: str,
+    title_right: str,
+    subtitle: str,
+    subtitle_right: str,
+    bullets: list[str] | None = None,
+) -> None:
+    title_para = doc.add_paragraph()
+    title_para.paragraph_format.tab_stops.add_tab_stop(Inches(7.5), WD_TAB_ALIGNMENT.RIGHT)
+    title_para.paragraph_format.space_after = Pt(2)
+    title_run = title_para.add_run(title or "")
+    title_run.bold = True
+    title_run.font.size = Pt(11)
+    title_para.add_run("\t")
+    title_right_run = title_para.add_run(title_right or "")
+    title_right_run.font.size = Pt(11)
+
+    subtitle_para = doc.add_paragraph()
+    subtitle_para.paragraph_format.tab_stops.add_tab_stop(Inches(7.5), WD_TAB_ALIGNMENT.RIGHT)
+    subtitle_para.paragraph_format.space_after = Pt(2)
+    subtitle_run = subtitle_para.add_run(subtitle or "")
+    subtitle_run.italic = True
+    subtitle_run.font.size = Pt(10.5)
+    subtitle_para.add_run("\t")
+    subtitle_right_run = subtitle_para.add_run(subtitle_right or "")
+    subtitle_right_run.italic = True
+    subtitle_right_run.font.size = Pt(10.5)
+
+    if bullets:
+        for bullet_text in bullets:
+            bullet_para = doc.add_paragraph(bullet_text, style="List Bullet")
+            bullet_para.paragraph_format.space_after = Pt(2)
+            for bullet_run in bullet_para.runs:
+                bullet_run.font.size = Pt(10.5)
+
+
+def render_cv_docx(cv: dict) -> Document:
+    """Build a CV Document from scratch (no template) matching a fixed visual
+    style. Returns the Document; the caller decides where to save it."""
+    doc = Document()
+
+    for section in doc.sections:
+        section.top_margin = Inches(0.5)
+        section.bottom_margin = Inches(0.5)
+        section.left_margin = Inches(0.5)
+        section.right_margin = Inches(0.5)
+
+    normal_style = doc.styles["Normal"]
+    normal_style.font.name = "Times New Roman"
+    normal_style.font.size = Pt(11)
+
+    name_para = doc.add_paragraph()
+    name_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    name_run = name_para.add_run(cv.get("name") or "")
+    name_run.bold = True
+    name_run.font.small_caps = True
+    name_run.font.size = Pt(24)
+
+    contact_para = doc.add_paragraph()
+    contact_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    contact_para.paragraph_format.space_before = Pt(2)
+    contact_run = contact_para.add_run(cv.get("contact") or "")
+    contact_run.font.size = Pt(10)
+
+    education = cv.get("education") or []
+    if education:
+        add_section_heading(doc, "Education")
+        for entry in education:
+            add_entry(
+                doc,
+                title=entry.get("school", ""),
+                title_right=entry.get("location", ""),
+                subtitle=entry.get("degree", ""),
+                subtitle_right=entry.get("dates", ""),
+            )
+
+    experience = cv.get("experience") or []
+    if experience:
+        add_section_heading(doc, "Experience")
+        for entry in experience:
+            add_entry(
+                doc,
+                title=entry.get("role", ""),
+                title_right=entry.get("dates", ""),
+                subtitle=entry.get("company", ""),
+                subtitle_right=entry.get("location", ""),
+                bullets=entry.get("bullets") or [],
+            )
+
+    projects = cv.get("projects") or []
+    if projects:
+        add_section_heading(doc, "Projects")
+        for project in projects:
+            para = doc.add_paragraph()
+            para.paragraph_format.space_after = Pt(4)
+            project_name_run = para.add_run(f"{project.get('name', '')}: ")
+            project_name_run.bold = True
+            project_name_run.font.size = Pt(10.5)
+            desc_run = para.add_run(project.get("description", ""))
+            desc_run.font.size = Pt(10.5)
+
+    leadership = cv.get("leadership") or []
+    if leadership:
+        add_section_heading(doc, "Others")
+        for item in leadership:
+            item_para = doc.add_paragraph(item, style="List Bullet")
+            for item_run in item_para.runs:
+                item_run.font.size = Pt(10.5)
+
+    skills = cv.get("skills") or {}
+    if skills:
+        add_section_heading(doc, "Skills")
+        for category, skill_list in skills.items():
+            para = doc.add_paragraph()
+            para.paragraph_format.space_after = Pt(2)
+            category_run = para.add_run(f"{category}: ")
+            category_run.bold = True
+            category_run.font.size = Pt(10.5)
+            items_run = para.add_run(", ".join(skill_list or []))
+            items_run.font.size = Pt(10.5)
+
+    return doc
 
 
 def _insert_paragraph_after(paragraph: Paragraph, text: str, style: str | None = None) -> Paragraph:

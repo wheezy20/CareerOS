@@ -23,6 +23,7 @@ from app.services.document_service import (
     generate_cv_docx,
     generate_cv_structured,
     load_template_text,
+    render_cv_docx,
     render_cv_html,
     _build_user_profile_json,
 )
@@ -196,7 +197,11 @@ def generate_cv_structured_preview(payload: dict[str, str], db: Session = Depend
             os.unlink(template_path)
 
     structured = generate_cv_structured(profile_context, parsed_job, template_text)
-    return {"structured": structured, "html": render_cv_html(structured)}
+
+    docx_name = f"preview_{uuid.uuid4().hex[:8]}.docx"
+    render_cv_docx(structured).save(str(GENERATED_DIR / docx_name))
+
+    return {"structured": structured, "html": render_cv_html(structured), "docxUrl": f"/generated/{docx_name}"}
 
 
 @router.post("/generate/cover-letter")
