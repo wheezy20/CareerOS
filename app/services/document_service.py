@@ -14,7 +14,7 @@ import httpx
 import pdfplumber
 from bs4 import BeautifulSoup
 from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_TAB_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt
@@ -42,7 +42,6 @@ from app.services.error_handlers import ClaudeAPIError, PDFExtractionError, Temp
 from app.services.prompt_templates import (
     build_cover_letter_customization_prompt,
     build_cold_email_prompt,
-    build_cv_customization_prompt,
     build_cv_structured_prompt,
 )
 
@@ -359,79 +358,9 @@ def _build_fallback_cold_email(user_profile_json: dict, parsed_job: dict) -> str
     )
 
 
-def _parse_bullets(text: str) -> list[str]:
-    cleaned = _clean_json_payload(text)
-    parts = cleaned.split("•") if "•" in cleaned else cleaned.splitlines()
-    bullets = [part.strip(" \t\n-*") for part in parts]
-    return [bullet for bullet in bullets if bullet]
-
-
 def _relevance_score(text_fields: list[str], job_terms: set[str]) -> int:
     haystack = " ".join(text_fields).lower()
     return sum(1 for term in job_terms if term in haystack)
-
-
-def _fallback_cv_bullets(user_profile_json: dict, parsed_job: dict) -> list[str]:
-    """Deterministic, metrics-aware fallback used when Claude is unavailable.
-
-    Ranks roles/projects by overlap with the job's requiredSkills/keywords so the
-    most relevant experience is chosen first, same intent as step 1 of the prompt.
-    """
-    job_terms = {
-        term.lower()
-        for term in (parsed_job.get("requiredSkills", []) + parsed_job.get("keywords", []))
-    }
-    bullets: list[str] = []
-
-    ranked_roles = sorted(
-        user_profile_json.get("roles", []),
-        key=lambda role: _relevance_score(
-            [role.get("title", ""), role.get("company", ""), role.get("description", "")], job_terms
-        ),
-        reverse=True,
-    )
-    ranked_projects = sorted(
-        user_profile_json.get("projects", []),
-        key=lambda project: _relevance_score(
-            [project.get("title", ""), project.get("description", "")]
-            + (project.get("technologies") or [])
-            + (project.get("outcomes") or []),
-            job_terms,
-        ),
-        reverse=True,
-    )
-
-    for role in ranked_roles[:2]:
-        metric = role.get("metrics") or next(iter(role.get("achievements") or []), None) or "drove adoption"
-        matched = sorted(t for t in job_terms if t in (role.get("description") or "").lower())
-        keyword_note = f" using {', '.join(matched[:2])}" if matched else ""
-        bullets.append(
-            f"Led {role.get('title', 'role')} work at {role.get('company', 'the company')}{keyword_note}, achieving {metric}."
-        )
-
-    for project in ranked_projects[:2]:
-        metric = project.get("metrics") or next(iter(project.get("outcomes") or []), None) or "designed system for production use"
-        techs = project.get("technologies") or []
-        tech_note = f" with {', '.join(techs[:2])}" if techs else ""
-        bullets.append(f"Built {project.get('title', 'project')}{tech_note}, resulting in {metric}.")
-
-    for achievement in user_profile_json.get("achievements", [])[:1]:
-        detail = achievement.get("details") or "drove adoption"
-        bullets.append(f"Recognized for {achievement.get('title', 'achievement')}: {detail}.")
-
-    return bullets or ["Drove adoption of new engineering practices across the team."]
-
-
-def customize_cv_text(user_profile_json: dict, parsed_job: dict) -> list[str]:
-    """Never raises: any Claude failure falls back to deterministic, metrics-aware bullets."""
-    prompt = build_cv_customization_prompt(user_profile_json, parsed_job)
-    try:
-        raw_text = call_claude(prompt, max_tokens=1200)
-        bullets = _parse_bullets(raw_text)
-        return bullets or _fallback_cv_bullets(user_profile_json, parsed_job)
-    except ClaudeAPIError as exc:
-        logger.warning("customize_cv_text falling back to deterministic bullets: %s", exc)
-        return _fallback_cv_bullets(user_profile_json, parsed_job)
 
 
 def _fallback_cv_structured(user_profile_json: dict) -> dict:
@@ -1020,74 +949,6 @@ def render_cover_letter_pdf(name: str, contact: str, content: str) -> bytes:
 
     doc.build(story)
     return buffer.getvalue()
-
-
-def _insert_paragraph_after(paragraph: Paragraph, text: str, style: str | None = None) -> Paragraph:
-    new_element = OxmlElement("w:p")
-    paragraph._p.addnext(new_element)
-    new_paragraph = Paragraph(new_element, paragraph._parent)
-    if style:
-        new_paragraph.style = style
-    if text:
-        new_paragraph.add_run(text)
-    return new_paragraph
-
-
-def _remove_existing_bullets_after(heading: Paragraph) -> None:
-    """Strip placeholder bullet paragraphs immediately under a section heading."""
-    next_element = heading._p.getnext()
-    while next_element is not None and next_element.tag == qn("w:p"):
-        next_paragraph = Paragraph(next_element, heading._parent)
-        style_name = (next_paragraph.style.name if next_paragraph.style else "") or ""
-        if "list" in style_name.lower() or "bullet" in style_name.lower():
-            following = next_element.getnext()
-            next_element.getparent().remove(next_element)
-            next_element = following
-        else:
-            break
-
-
-def _write_bullets(doc: Document, heading: Paragraph | None, bullets: list[str]) -> None:
-    cleaned_bullets = [b.strip(" \t\n-*") for b in bullets]
-    cleaned_bullets = [b for b in cleaned_bullets if b]
-
-    if heading is None:
-        heading = doc.add_paragraph()
-        heading.text = "Experience"
-
-    _remove_existing_bullets_after(heading)
-
-    anchor = heading
-    for bullet in cleaned_bullets:
-        anchor = _insert_paragraph_after(anchor, bullet, style="List Bullet")
-        anchor.paragraph_format.left_indent = Inches(0.2)
-
-
-def generate_cv_docx(template_path: str, customized_bullets: list[str], output_path: str) -> str:
-    output = Path(output_path)
-    output.parent.mkdir(parents=True, exist_ok=True)
-
-    doc = load_template_document(template_path) if template_path.lower().endswith(".docx") else Document()
-    is_blank_template = len(doc.paragraphs) == 0
-
-    if is_blank_template:
-        doc.add_heading("Customized CV", level=1)
-        heading = doc.add_paragraph("Experience")
-        _write_bullets(doc, heading, customized_bullets)
-        doc.save(str(output))
-        return str(output)
-
-    target = None
-    for paragraph in doc.paragraphs:
-        text = paragraph.text.strip().lower()
-        if "work experience" in text or "professional experience" in text or "experience" in text:
-            target = paragraph
-            break
-
-    _write_bullets(doc, target, customized_bullets)
-
-    doc.save(str(output))
-    return str(output)
 
 
 def generate_cover_letter_content(user_profile_json: dict, parsed_job: dict, template_text: str) -> str:
