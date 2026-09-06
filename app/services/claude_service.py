@@ -14,7 +14,10 @@ from app.models import Profile, Project, Role, Skill
 from app.schemas import MatchAnalysisSchema, ParsedJobSchema
 from app.services.error_handlers import ClaudeAPIError
 
-CLAUDE_MODEL = "claude-sonnet-5"
+# Cheaper model for structured extraction/scoring tasks (parsing, matching);
+# the pricier model is reserved for tasks that generate user-facing prose.
+CLAUDE_MODEL_EXTRACTION = "claude-haiku-4-5-20251001"
+CLAUDE_MODEL_GENERATION = "claude-sonnet-5"
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +40,15 @@ client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY")) if os.getenv("ANTHROP
 RATE_LIMIT_RETRY_SECONDS = 60
 
 
-def call_claude(prompt: str, max_tokens: int) -> str:
+def call_claude(prompt: str, max_tokens: int, model: str) -> str:
     """Call Claude with a single retry on rate-limit and typed error translation.
 
     Never raises anthropic's own exceptions — always raises ClaudeAPIError so callers
     can catch one type and fall back to their deterministic response. Never crashes
     the caller; the caller decides what "usable fallback" means for its endpoint.
+
+    model is required (not defaulted) so every call site states its own cost/quality
+    tradeoff explicitly — see CLAUDE_MODEL_EXTRACTION / CLAUDE_MODEL_GENERATION above.
     """
     if client is None:
         raise ClaudeAPIError("Claude client not configured (no API key)")
@@ -50,7 +56,7 @@ def call_claude(prompt: str, max_tokens: int) -> str:
     for attempt in (1, 2):
         try:
             response = client.messages.create(
-                model=CLAUDE_MODEL,
+                model=model,
                 max_tokens=max_tokens,
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -202,7 +208,7 @@ Job Description:
 {job_text}
 """
     try:
-        raw_text = call_claude(prompt, max_tokens=8000)
+        raw_text = call_claude(prompt, max_tokens=8000, model=CLAUDE_MODEL_EXTRACTION)
         content = _clean_json_payload(raw_text)
         data = json.loads(content)
         return ParsedJobSchema(**data)
@@ -253,7 +259,7 @@ Return ONLY valid JSON matching this shape:
 }}
 """
     try:
-        raw_text = call_claude(prompt, max_tokens=3000)
+        raw_text = call_claude(prompt, max_tokens=3000, model=CLAUDE_MODEL_GENERATION)
         content = _clean_json_payload(raw_text)
         data = json.loads(content)
         return MatchAnalysisSchema(**data)

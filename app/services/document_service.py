@@ -37,7 +37,7 @@ from reportlab.platypus import (
 
 from app.models import Achievement, Course, ParsedJob, Profile, Project, Role, Skill, Template
 from app.schemas import ParsedJobSchema
-from app.services.claude_service import call_claude
+from app.services.claude_service import CLAUDE_MODEL_GENERATION, call_claude
 from app.services.error_handlers import ClaudeAPIError, PDFExtractionError, TemplateError, URLFetchError
 from app.services.prompt_templates import (
     build_cover_letter_customization_prompt,
@@ -417,7 +417,7 @@ def generate_cv_structured(user_profile_json: dict, parsed_job: dict, template_t
     deterministic structure built directly from user_profile_json."""
     prompt = build_cv_structured_prompt(user_profile_json, parsed_job, template_text)
     try:
-        raw_text = call_claude(prompt, max_tokens=20000)
+        raw_text = call_claude(prompt, max_tokens=20000, model=CLAUDE_MODEL_GENERATION)
         content = _clean_json_payload(raw_text)
         data = json.loads(content)
         if not isinstance(data, dict) or not _CV_STRUCTURED_KEYS.issubset(data.keys()):
@@ -956,7 +956,7 @@ def generate_cover_letter_content(user_profile_json: dict, parsed_job: dict, tem
     Returns the cleaned letter body text (the part that goes between salutation and closing)."""
     prompt = build_cover_letter_customization_prompt(user_profile_json, parsed_job, template_text)
     try:
-        raw_text = call_claude(prompt, max_tokens=6000)
+        raw_text = call_claude(prompt, max_tokens=6000, model=CLAUDE_MODEL_GENERATION)
         return _clean_text_payload(raw_text)
     except ClaudeAPIError as exc:
         logger.warning("generate_cover_letter_content falling back to deterministic letter: %s", exc)
@@ -1016,7 +1016,7 @@ def generate_cold_email(user_profile_json: dict, parsed_job: dict) -> str:
     """Never raises: any Claude failure falls back to a deterministic, personalized email."""
     prompt = build_cold_email_prompt(user_profile_json, parsed_job)
     try:
-        raw_text = call_claude(prompt, max_tokens=3000)
+        raw_text = call_claude(prompt, max_tokens=3000, model=CLAUDE_MODEL_GENERATION)
         text = _clean_text_payload(raw_text)
         if text.startswith("Subject:"):
             text = "\n".join(text.splitlines()[1:]) if len(text.splitlines()) > 1 else ""
