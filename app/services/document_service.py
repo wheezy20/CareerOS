@@ -13,6 +13,7 @@ from typing import Any
 import httpx
 import pdfplumber
 from bs4 import BeautifulSoup
+from PIL import Image
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement
@@ -38,7 +39,13 @@ from reportlab.platypus import (
 from app.models import Achievement, Course, ParsedJob, Profile, Project, Role, Skill, Template
 from app.schemas import ParsedJobSchema
 from app.services.claude_service import CLAUDE_MODEL_GENERATION, call_claude
-from app.services.error_handlers import ClaudeAPIError, PDFExtractionError, TemplateError, URLFetchError
+from app.services.error_handlers import (
+    ClaudeAPIError,
+    ImageExtractionError,
+    PDFExtractionError,
+    TemplateError,
+    URLFetchError,
+)
 from app.services.prompt_templates import (
     build_cover_letter_customization_prompt,
     build_cold_email_prompt,
@@ -91,6 +98,43 @@ def extract_pdf_text(contents: bytes) -> str:
     except Exception as exc:
         logger.error("Failed to open PDF: %s", exc)
         raise PDFExtractionError("Invalid PDF file") from exc
+
+
+# Anthropic's vision API caps a base64-encoded image at 10MB; base64 inflates
+# raw bytes by ~4/3, so 7MB raw stays comfortably under that after encoding.
+MAX_IMAGE_BYTES = 7 * 1024 * 1024
+
+_SUPPORTED_IMAGE_FORMATS = {
+    "PNG": "image/png",
+    "JPEG": "image/jpeg",
+    "GIF": "image/gif",
+    "WEBP": "image/webp",
+}
+
+
+def validate_image(contents: bytes) -> str:
+    """Verify the bytes are a real, supported image and return its Anthropic media_type.
+
+    Never trusts the caller's filename or Content-Type header — only what Pillow
+    actually decodes from the bytes. Raises ImageExtractionError, never crashes."""
+    if len(contents) > MAX_IMAGE_BYTES:
+        size_mb = len(contents) / 1024 / 1024
+        raise ImageExtractionError(f"Image is too large ({size_mb:.1f}MB) — max {MAX_IMAGE_BYTES // (1024 * 1024)}MB")
+
+    try:
+        with Image.open(io.BytesIO(contents)) as img:
+            img.verify()
+        # verify() leaves the file handle unusable for further reads, so reopen
+        # to read the format from a fresh handle.
+        with Image.open(io.BytesIO(contents)) as img:
+            fmt = img.format
+    except Exception as exc:
+        raise ImageExtractionError("Invalid image file") from exc
+
+    media_type = _SUPPORTED_IMAGE_FORMATS.get(fmt or "")
+    if media_type is None:
+        raise ImageExtractionError(f"Unsupported image format: {fmt or 'unknown'} (use PNG, JPEG, GIF, or WebP)")
+    return media_type
 
 
 def extract_url_text(url: str) -> str:

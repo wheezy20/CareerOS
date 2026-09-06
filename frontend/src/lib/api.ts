@@ -167,6 +167,12 @@ export const api = {
     form.append("file", file);
     return fetchJson("POST", "/job/parse/pdf", form);
   },
+  async parseJobFromImage(file: File): Promise<ParsedJob> {
+    if (USE_MOCKS) return delay({ ...mock.mockParsedJob, id: id() }, 900);
+    const form = new FormData();
+    form.append("file", file);
+    return fetchJson("POST", "/job/parse/image", form);
+  },
   async parseJobFromURL(url: string): Promise<ParsedJob> {
     return USE_MOCKS ? delay({ ...mock.mockParsedJob, id: id() }, 900) : fetchJson("POST", "/job/parse/url", { url });
   },

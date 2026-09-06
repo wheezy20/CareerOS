@@ -133,8 +133,12 @@ function StepInput({ onParsed }: { onParsed: (p: ParsedJob) => void }) {
         <TabsContent value="upload" className="pt-4">
           <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-card/40 py-10 transition-colors hover:border-primary/40 hover:bg-accent/30">
             <Upload className="h-6 w-6 text-muted-foreground" />
-            <span className="text-sm">Drop the job description PDF</span>
-            <input type="file" accept=".pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handle(api.parseJobFromPDF(f)); }} />
+            <span className="text-sm">Drop a PDF or screenshot of the job description</span>
+            <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif" className="hidden" onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              handle(f.type.startsWith("image/") ? api.parseJobFromImage(f) : api.parseJobFromPDF(f));
+            }} />
           </label>
         </TabsContent>
         <TabsContent value="link" className="pt-4 space-y-3">

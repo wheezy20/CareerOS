@@ -19,3 +19,4 @@ psycopg2-binary==2.9.12
 sentry-sdk[fastapi]==2.65.0
 pypdf==5.1.0
 reportlab==5.0.0
+pillow==12.3.0

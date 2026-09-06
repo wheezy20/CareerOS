@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -40,7 +41,7 @@ client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY")) if os.getenv("ANTHROP
 RATE_LIMIT_RETRY_SECONDS = 60
 
 
-def call_claude(prompt: str, max_tokens: int, model: str) -> str:
+def call_claude(prompt: str, max_tokens: int, model: str, image: tuple[bytes, str] | None = None) -> str:
     """Call Claude with a single retry on rate-limit and typed error translation.
 
     Never raises anthropic's own exceptions — always raises ClaudeAPIError so callers
@@ -49,16 +50,37 @@ def call_claude(prompt: str, max_tokens: int, model: str) -> str:
 
     model is required (not defaulted) so every call site states its own cost/quality
     tradeoff explicitly — see CLAUDE_MODEL_EXTRACTION / CLAUDE_MODEL_GENERATION above.
+
+    image, if given, is (raw_bytes, media_type) — e.g. (png_bytes, "image/png") — and
+    switches the message content from a plain string to a multimodal content-block
+    list (image before text, per Anthropic's own prompting guidance). Every existing
+    caller omits it and is unaffected.
     """
     if client is None:
         raise ClaudeAPIError("Claude client not configured (no API key)")
+
+    if image is not None:
+        image_bytes, media_type = image
+        content: str | list[dict[str, Any]] = [
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": media_type,
+                    "data": base64.standard_b64encode(image_bytes).decode("utf-8"),
+                },
+            },
+            {"type": "text", "text": prompt},
+        ]
+    else:
+        content = prompt
 
     for attempt in (1, 2):
         try:
             response = client.messages.create(
                 model=model,
                 max_tokens=max_tokens,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role": "user", "content": content}],
             )
             text_parts = [
                 block.text for block in response.content
@@ -181,19 +203,10 @@ def _fallback_parsed_job(job_text: str) -> ParsedJobSchema:
     )
 
 
-def parse_job_description(job_text: str) -> ParsedJobSchema:
-    """Extract structured fields from raw job posting text using Claude.
-
-    Never raises: any Claude failure (auth, timeout, rate limit exhausted, bad JSON)
-    falls back to a deterministic keyword-scan parse that still carries the real
-    extracted text through in full_description, so callers always get a usable,
-    if partial, ParsedJobSchema.
-    """
-    prompt = f"""
-You are an expert recruiter and job description analyst. Extract structured insights from the following job posting.
+_JOB_EXTRACTION_INSTRUCTIONS = """You are an expert recruiter and job description analyst. Extract structured insights from the following job posting.
 
 Return ONLY valid JSON matching this shape:
-{{
+{
   "title": "...",
   "company": "...",
   "location": "...",
@@ -202,7 +215,18 @@ Return ONLY valid JSON matching this shape:
   "keywords": ["..."],
   "years_required": "",
   "full_description": "..."
-}}
+}"""
+
+
+def parse_job_description(job_text: str) -> ParsedJobSchema:
+    """Extract structured fields from raw job posting text using Claude.
+
+    Never raises: any Claude failure (auth, timeout, rate limit exhausted, bad JSON)
+    falls back to a deterministic keyword-scan parse that still carries the real
+    extracted text through in full_description, so callers always get a usable,
+    if partial, ParsedJobSchema.
+    """
+    prompt = f"""{_JOB_EXTRACTION_INSTRUCTIONS}
 
 Job Description:
 {job_text}
@@ -222,6 +246,35 @@ Job Description:
         logger.warning("parse_job_description falling back to keyword scan: %s", exc)
         sentry_sdk.capture_exception(exc)
         parsed = _fallback_parsed_job(job_text)
+        parsed.is_fallback = True
+        return parsed
+
+
+def parse_job_image(image_bytes: bytes, media_type: str) -> ParsedJobSchema:
+    """Same contract as parse_job_description, but for a screenshot of a job posting
+    instead of already-extracted text — sent to Claude as a multimodal message so
+    the model reads the image directly (no local OCR step).
+
+    Never raises: falls back the same way parse_job_description does, except there's
+    no extracted text to keyword-scan, so the fallback is the generic baseline with
+    is_fallback set — callers already surface that to the user.
+    """
+    prompt = f"""{_JOB_EXTRACTION_INSTRUCTIONS}
+
+The job posting is shown in the attached image. Read all visible text carefully,
+including any text in headers, sidebars, or footers.
+"""
+    try:
+        raw_text = call_claude(
+            prompt, max_tokens=8000, model=CLAUDE_MODEL_EXTRACTION, image=(image_bytes, media_type)
+        )
+        content = _clean_json_payload(raw_text)
+        data = json.loads(content)
+        return ParsedJobSchema(**data)
+    except (ClaudeAPIError, json.JSONDecodeError, TypeError) as exc:
+        logger.warning("parse_job_image falling back to generic baseline: %s", exc)
+        sentry_sdk.capture_exception(exc)
+        parsed = _fallback_parsed_job("")  # no extracted text to scan for an image
         parsed.is_fallback = True
         return parsed
 

@@ -5,6 +5,10 @@ class PDFExtractionError(Exception):
     """Raised when a PDF is corrupted, empty, or has no extractable text layer."""
 
 
+class ImageExtractionError(Exception):
+    """Raised when an image is corrupted, unreadable, an unsupported format, or too large."""
+
+
 class URLFetchError(Exception):
     """Raised when a target URL is unreachable, times out, or returns a non-200 status."""
 

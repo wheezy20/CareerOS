@@ -13,9 +13,10 @@ from app.services.claude_service import (
     build_profile_context,
     compute_match_analysis,
     parse_job_description,
+    parse_job_image,
 )
-from app.services.document_service import extract_pdf_text, extract_url_text
-from app.services.error_handlers import PDFExtractionError, URLFetchError
+from app.services.document_service import extract_pdf_text, extract_url_text, validate_image
+from app.services.error_handlers import ImageExtractionError, PDFExtractionError, URLFetchError
 
 router = APIRouter(tags=["job"])
 
@@ -58,6 +59,22 @@ async def parse_job_pdf(file: UploadFile = File(...), db: Session = Depends(get_
     # deterministic keyword-scan ParsedJobSchema that still carries the real
     # extracted text, so the caller always gets something usable.
     parsed = parse_job_description(text)
+    return _save_parsed_job(db, parsed)
+
+
+@router.post("/job/parse/image", response_model=ParsedJobSchema, response_model_by_alias=True)
+async def parse_job_image_endpoint(file: UploadFile = File(...), db: Session = Depends(get_db)) -> ParsedJob:
+    contents = await file.read()
+    try:
+        media_type = validate_image(contents)
+    except ImageExtractionError as exc:
+        logger.error("Image validation failed for upload %r: %s", file.filename, exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # parse_job_image never raises — on a Claude failure it returns a generic
+    # fallback ParsedJobSchema with is_fallback set, so the caller always gets
+    # something usable (surfaced to the user by the frontend as a warning).
+    parsed = parse_job_image(contents, media_type)
     return _save_parsed_job(db, parsed)
 
 
