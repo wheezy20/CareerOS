@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import Column, Integer, JSON, String, Text
+from sqlalchemy import Column, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
@@ -16,6 +16,7 @@ class Role(Base):
     __tablename__ = "roles"
 
     id = Column(String, primary_key=True, default=gen_id)
+    user_id = Column(String, ForeignKey("auth_users.id"), nullable=False, index=True)
     title = Column(String, nullable=False)
     company = Column(String, nullable=False)
     start_date = Column(String, nullable=False)
@@ -29,6 +30,7 @@ class Project(Base):
     __tablename__ = "projects"
 
     id = Column(String, primary_key=True, default=gen_id)
+    user_id = Column(String, ForeignKey("auth_users.id"), nullable=False, index=True)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     technologies = Column(JSON, nullable=False, default=list)
@@ -44,6 +46,7 @@ class Skill(Base):
     __tablename__ = "skills"
 
     id = Column(String, primary_key=True, default=gen_id)
+    user_id = Column(String, ForeignKey("auth_users.id"), nullable=False, index=True)
     name = Column(String, nullable=False)
     category = Column(String, nullable=False)
     proficiency = Column(Integer, nullable=False)
@@ -55,6 +58,7 @@ class Course(Base):
     __tablename__ = "courses"
 
     id = Column(String, primary_key=True, default=gen_id)
+    user_id = Column(String, ForeignKey("auth_users.id"), nullable=False, index=True)
     name = Column(String, nullable=False)
     provider = Column(String, nullable=False)
     date_completed = Column(String, nullable=False)
@@ -67,6 +71,7 @@ class Achievement(Base):
     __tablename__ = "achievements"
 
     id = Column(String, primary_key=True, default=gen_id)
+    user_id = Column(String, ForeignKey("auth_users.id"), nullable=False, index=True)
     title = Column(String, nullable=False)
     type = Column(String, nullable=False)
     date = Column(String, nullable=False)
@@ -78,6 +83,7 @@ class FileEntry(Base):
     __tablename__ = "files"
 
     id = Column(String, primary_key=True, default=gen_id)
+    user_id = Column(String, ForeignKey("auth_users.id"), nullable=False, index=True)
     name = Column(String, nullable=False)
     size = Column(Integer, nullable=False)
     type = Column(String, nullable=False)
@@ -89,6 +95,7 @@ class LinkEntry(Base):
     __tablename__ = "links"
 
     id = Column(String, primary_key=True, default=gen_id)
+    user_id = Column(String, ForeignKey("auth_users.id"), nullable=False, index=True)
     title = Column(String, nullable=False)
     url = Column(String, nullable=False)
 
@@ -97,6 +104,7 @@ class OtherEntry(Base):
     __tablename__ = "others"
 
     id = Column(String, primary_key=True, default=gen_id)
+    user_id = Column(String, ForeignKey("auth_users.id"), nullable=False, index=True)
     title = Column(String, nullable=False)
     category = Column(String, nullable=False)
     date = Column(String, nullable=True)
@@ -110,6 +118,7 @@ class Application(Base):
     __tablename__ = "applications"
 
     id = Column(String, primary_key=True, default=gen_id)
+    user_id = Column(String, ForeignKey("auth_users.id"), nullable=False, index=True)
     job_title = Column(String, nullable=False)
     company = Column(String, nullable=False)
     date_applied = Column(String, nullable=False)
@@ -123,6 +132,7 @@ class Template(Base):
     __tablename__ = "templates"
 
     id = Column(String, primary_key=True, default=gen_id)
+    user_id = Column(String, ForeignKey("auth_users.id"), nullable=False, index=True)
     type = Column(String, nullable=False)
     file_name = Column(String, nullable=False)
     uploaded_at = Column(String, nullable=False)
@@ -147,6 +157,7 @@ class ParsedJob(Base):
     __tablename__ = "parsed_jobs"
 
     id = Column(String, primary_key=True, default=gen_id)
+    user_id = Column(String, ForeignKey("auth_users.id"), nullable=False, index=True)
     title = Column(String, nullable=False)
     company = Column(String, nullable=False)
     location = Column(String, nullable=False)
@@ -161,6 +172,7 @@ class GeneratedCv(Base):
     __tablename__ = "generated_cvs"
 
     id = Column(String, primary_key=True, default=gen_id)
+    user_id = Column(String, ForeignKey("auth_users.id"), nullable=False, index=True)
     job_id = Column(String, nullable=False)
     project_ids = Column(JSON, nullable=False, default=list)
     generated_at = Column(String, nullable=False)

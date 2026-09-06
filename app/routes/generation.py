@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Achievement, Course, GeneratedCv, ParsedJob, Profile, Project, Role, Skill, Template
+from app.routes._shared import current_owner_id
 from app.schemas import ParsedJobSchema
 from app.services.document_service import (
     generate_cold_email,
@@ -185,6 +186,7 @@ def generate_cv(payload: dict[str, str], db: Session = Depends(get_db)) -> dict:
 
     project_ids = [project.id for project in db.query(Project).all()]
     db.add(GeneratedCv(
+        user_id=current_owner_id(db),
         job_id=job_id,
         project_ids=project_ids,
         generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d"),

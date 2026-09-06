@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Achievement, Course, FileEntry, LinkEntry, OtherEntry, Project, Role, Skill
+from app.routes._shared import current_owner_id
 from app.schemas import (
     AchievementSchema,
     CourseSchema,
@@ -44,7 +45,7 @@ def _upsert_entity(db: Session, model: Type[ModelType], schema: Type[SchemaType]
         return obj
 
     data.pop("id", None)
-    obj = model(**data)
+    obj = model(user_id=current_owner_id(db), **data)
     db.add(obj)
     db.commit()
     db.refresh(obj)
@@ -197,6 +198,7 @@ def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)) -> 
     upload_bytes(object_path, data, content_type=file.content_type)
 
     payload = FileEntry(
+        user_id=current_owner_id(db),
         name=file.filename or "upload",
         size=len(data),
         type=file.content_type or "application/octet-stream",

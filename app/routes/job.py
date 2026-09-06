@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ParsedJob, Profile, Project, Role, Skill
+from app.routes._shared import current_owner_id
 from app.schemas import MatchAnalysisSchema, ParsedJobSchema
 from app.services.claude_service import (
     build_profile_context,
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 def _save_parsed_job(db: Session, parsed: ParsedJobSchema) -> ParsedJob:
     record = ParsedJob(
+        user_id=current_owner_id(db),
         title=parsed.title,
         company=parsed.company,
         location=parsed.location,

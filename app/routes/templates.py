@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Template
+from app.routes._shared import current_owner_id
 from app.schemas import TemplateSchema
 from app.services.storage_service import generate_signed_url, upload_bytes
 
@@ -41,6 +42,7 @@ def upload_template(
 
     uploaded_at = datetime.utcnow().strftime("%Y-%m-%d")
     record = Template(
+        user_id=current_owner_id(db),
         type=kind,
         file_name=file.filename or object_path,
         uploaded_at=uploaded_at,

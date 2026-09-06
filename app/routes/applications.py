@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Application
+from app.routes._shared import current_owner_id
 from app.schemas import ApplicationSchema
 
 router = APIRouter(tags=["applications"])
@@ -32,7 +33,7 @@ def save_application(payload: ApplicationSchema, db: Session = Depends(get_db)) 
         return obj
 
     data.pop("id", None)
-    obj = Application(**data)
+    obj = Application(user_id=current_owner_id(db), **data)
     db.add(obj)
     db.commit()
     db.refresh(obj)
