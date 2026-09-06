@@ -193,6 +193,7 @@ export const mockParsedJob: ParsedJob = {
   keywords: ["velocity", "craft", "opinionated", "ownership"],
   yearsRequired: "5+ years",
   fullDescription: "We are looking for a senior frontend engineer to help shape the next generation of Linear...",
+  isFallback: false,
 };
 
 export const mockMatch: MatchAnalysis = {

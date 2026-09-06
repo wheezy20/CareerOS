@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+import sentry_sdk
 from anthropic import Anthropic, APITimeoutError, AuthenticationError, RateLimitError
 
 from app.models import Profile, Project, Role, Skill
@@ -206,8 +207,17 @@ Job Description:
         data = json.loads(content)
         return ParsedJobSchema(**data)
     except (ClaudeAPIError, json.JSONDecodeError, TypeError) as exc:
+        # logger.warning alone isn't enough here: Sentry's default logging
+        # integration only promotes ERROR+ records to captured events, and a
+        # JSONDecodeError/TypeError from a malformed Claude response never
+        # passes through call_claude's own logger.error calls at all. Capture
+        # explicitly so "we silently degraded to fallback data" is always
+        # visible in Sentry, regardless of which branch caused it.
         logger.warning("parse_job_description falling back to keyword scan: %s", exc)
-        return _fallback_parsed_job(job_text)
+        sentry_sdk.capture_exception(exc)
+        parsed = _fallback_parsed_job(job_text)
+        parsed.is_fallback = True
+        return parsed
 
 
 def compute_match_analysis(user_profile_json: dict, parsed_job: dict) -> MatchAnalysisSchema:

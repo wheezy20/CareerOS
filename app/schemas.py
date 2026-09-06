@@ -132,6 +132,7 @@ class ParsedJobSchema(CamelModel):
     keywords: List[str] = []
     years_required: str = ""
     full_description: str = ""
+    is_fallback: bool = False
 
 
 class MatchAnalysisSchema(CamelModel):

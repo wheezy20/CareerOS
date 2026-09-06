@@ -37,6 +37,11 @@ def _save_parsed_job(db: Session, parsed: ParsedJobSchema) -> ParsedJob:
     db.add(record)
     db.commit()
     db.refresh(record)
+    # Not a mapped column — a transient attribute so the response_model
+    # (from_attributes) can read it back via getattr without a schema change
+    # to ParsedJob itself. db.refresh() only reloads mapped columns, so this
+    # survives untouched; set after refresh to avoid any doubt about that.
+    record.is_fallback = parsed.is_fallback
     return record
 
 

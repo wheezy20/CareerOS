@@ -8,11 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { PageHeader } from "@/components/page-header";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { api } from "@/lib/api";
 import type { ParsedJob, MatchAnalysis } from "@/lib/types";
 import {
   Upload, LinkIcon, ClipboardPaste, Loader2, Sparkles, FileText, Mail,
-  Download, Copy, RefreshCw, CheckCircle2, ChevronDown,
+  Download, Copy, RefreshCw, CheckCircle2, ChevronDown, AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -89,10 +90,19 @@ function StepInput({ onParsed }: { onParsed: (p: ParsedJob) => void }) {
   const [url, setUrl] = useState(""); const [text, setText] = useState("");
   const [activeTab, setActiveTab] = useState("paste");
 
+  function notifyParsed(p: ParsedJob) {
+    if (p.isFallback) {
+      toast.warning("Couldn't reach AI parser — showing basic keyword extraction instead");
+    } else {
+      toast.success("Job parsed");
+    }
+    onParsed(p);
+  }
+
   function handle(promise: Promise<ParsedJob>) {
     setLoading(true);
     promise
-      .then((p) => { toast.success("Job parsed"); onParsed(p); })
+      .then(notifyParsed)
       .catch((err) => {
         const message = err?.message || "Couldn't parse that job";
         toast.error(message);
@@ -104,7 +114,7 @@ function StepInput({ onParsed }: { onParsed: (p: ParsedJob) => void }) {
     if (!url) return;
     setLoading(true);
     api.parseJobFromURL(url)
-      .then((p) => { toast.success("Job parsed"); onParsed(p); })
+      .then(notifyParsed)
       .catch(() => {
         toast.error("Couldn't fetch that URL — paste the job description instead");
         setActiveTab("paste");
@@ -151,6 +161,15 @@ function StepReview({ parsed, match, onNext, onBack }: {
 }) {
   return (
     <div className="space-y-4">
+      {parsed.isFallback && (
+        <Alert className="border-warning/40 bg-warning/10 text-warning-foreground">
+          <AlertTriangle className="h-4 w-4 text-warning" />
+          <AlertDescription className="text-warning-foreground">
+            Couldn't reach the AI parser, showing basic keyword extraction instead. Title, skills,
+            and responsibilities below may be inaccurate — consider retrying the parse.
+          </AlertDescription>
+        </Alert>
+      )}
       <Card><CardContent className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div>

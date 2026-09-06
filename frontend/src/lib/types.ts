@@ -95,6 +95,7 @@ export type ParsedJob = {
   keywords: string[];
   yearsRequired: string;
   fullDescription: string;
+  isFallback: boolean;
 };
 
 export type MatchAnalysis = {
