@@ -130,11 +130,7 @@ def analyze_job(
     if job is None:
         raise HTTPException(status_code=404, detail="Parsed job not found")
 
-    # Profile stays a global "me" singleton for this phase (not yet per-user
-    # — see app/routes/profile.py). Role/Project/Skill are scoped: unscoped
-    # here would leak another user's skills/experience into this user's
-    # match score and gap analysis, not just into a list they can see.
-    profile = db.query(Profile).filter(Profile.id == "me").first()
+    profile = db.query(Profile).filter(Profile.user_id == user_id).first()
     roles = db.query(Role).filter(Role.user_id == user_id).all()
     projects = db.query(Project).filter(Project.user_id == user_id).all()
     skills = db.query(Skill).filter(Skill.user_id == user_id).all()

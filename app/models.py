@@ -143,6 +143,7 @@ class Profile(Base):
     __tablename__ = "profile"
 
     id = Column(String, primary_key=True, default="me")
+    user_id = Column(String, ForeignKey("auth_users.id"), unique=True, nullable=False)
     name = Column(String, nullable=False, default="")
     email = Column(String, nullable=False, default="")
     phone = Column(String, nullable=False, default="")

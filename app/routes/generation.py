@@ -75,9 +75,7 @@ def _find_job(db: Session, job_id: str, user_id: str) -> ParsedJob:
 
 
 def _find_profile_context(db: Session, user_id: str) -> dict[str, Any]:
-    # Profile stays a global "me" singleton for this phase (see
-    # app/routes/profile.py) — everything else is scoped per user.
-    profile = db.query(Profile).filter(Profile.id == "me").first()
+    profile = db.query(Profile).filter(Profile.user_id == user_id).first()
     roles = db.query(Role).filter(Role.user_id == user_id).all()
     projects = db.query(Project).filter(Project.user_id == user_id).all()
     skills = db.query(Skill).filter(Skill.user_id == user_id).all()
