@@ -142,4 +142,8 @@ export type VelocityPoint = { week: string; count: number };
 
 export type AuthUser = { id: string; login: string; avatar?: string };
 
-export type AuthTokenResponse = { token: string; user: AuthUser };
+export type OAuthProvider = "github" | "google";
+
+export type OAuthCallbackResponse =
+  | { status: "approved"; token: string; user: AuthUser }
+  | { status: "pending" };

@@ -179,15 +179,20 @@ class GeneratedCv(Base):
 
 
 class AuthUser(Base):
-    """The single allowed owner of this personal instance.
+    """An account allowed to sign in, from any supported OAuth provider.
 
-    Populated by whichever GitHub account completes OAuth first, unless
-    ALLOWED_GITHUB_USERNAME is set in the environment — in that case the
-    login check uses that instead and this table is informational only.
+    Populated by whichever account completes OAuth first (becomes the
+    approved owner), unless ALLOWED_GITHUB_USERNAME is set in the environment
+    — in that case the login check uses that instead for GitHub sign-ins.
+    Every account after the first owner is created with status="pending"
+    and needs to be approved (currently: manually, by updating this row)
+    before it can sign in — see app/routes/auth.py.
     """
 
     __tablename__ = "auth_users"
 
-    id = Column(String, primary_key=True)  # GitHub user id, as a string
+    id = Column(String, primary_key=True)  # the provider's user id, as a string
+    provider = Column(String, nullable=False, default="github")
     login = Column(String, nullable=False)
     avatar_url = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="pending")

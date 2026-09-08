@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 import time
+from dataclasses import dataclass
+from typing import Awaitable, Callable, Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -19,9 +21,14 @@ logger = logging.getLogger(__name__)
 JWT_ALGORITHM = "HS256"
 JWT_TTL_SECONDS = 7 * 24 * 60 * 60  # 7 days
 
+SUPPORTED_PROVIDERS = ("github", "google")
+
 
 class CodeExchangeRequest(BaseModel):
     code: str
+    # Required for Google (its token endpoint validates this matches the
+    # authorize-step redirect_uri exactly); GitHub's adapter ignores it.
+    redirect_uri: str | None = None
 
 
 class UserOut(BaseModel):
@@ -30,9 +37,10 @@ class UserOut(BaseModel):
     avatar: str | None = None
 
 
-class TokenResponse(BaseModel):
-    token: str
-    user: UserOut
+class CallbackResponse(BaseModel):
+    status: Literal["approved", "pending"]
+    token: str | None = None
+    user: UserOut | None = None
 
 
 def _mint_token(user_id: str) -> str:
@@ -84,23 +92,16 @@ def require_auth(request: Request) -> None:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
 
-def _check_allowed(db: Session, github_id: str, login: str, avatar_url: str | None) -> None:
-    """Enforce single-user access: either the configured username, or whoever logs in first."""
-    if settings.allowed_github_username:
-        if login.lower() != settings.allowed_github_username.lower():
-            raise HTTPException(status_code=403, detail="This account is not authorized for this instance")
-        return
+@dataclass
+class NormalizedUser:
+    """The shape every provider adapter normalizes its OAuth user info into."""
 
-    owner = db.query(AuthUser).first()
-    if owner is None:
-        db.add(AuthUser(id=github_id, login=login, avatar_url=avatar_url))
-        db.commit()
-    elif owner.id != github_id:
-        raise HTTPException(status_code=403, detail="This account is not authorized for this instance")
+    id: str
+    login: str
+    avatar_url: str | None
 
 
-@router.post("/callback", response_model=TokenResponse)
-async def github_callback(payload: CodeExchangeRequest, db: Session = Depends(get_db)) -> TokenResponse:
+async def _github_adapter(code: str, redirect_uri: str | None) -> NormalizedUser:
     async with httpx.AsyncClient() as client:
         token_res = await client.post(
             "https://github.com/login/oauth/access_token",
@@ -108,7 +109,7 @@ async def github_callback(payload: CodeExchangeRequest, db: Session = Depends(ge
             data={
                 "client_id": settings.github_client_id,
                 "client_secret": settings.github_client_secret,
-                "code": payload.code,
+                "code": code,
             },
         )
         token_data = token_res.json()
@@ -116,7 +117,7 @@ async def github_callback(payload: CodeExchangeRequest, db: Session = Depends(ge
         redacted = {k: ("***REDACTED***" if k == "access_token" else v) for k, v in token_data.items()}
         logger.warning(
             "GitHub token exchange: http_status=%s code_prefix=%s body=%s",
-            token_res.status_code, payload.code[:6], redacted,
+            token_res.status_code, code[:6], redacted,
         )
         access_token = token_data.get("access_token")
         if not access_token:
@@ -130,14 +131,108 @@ async def github_callback(payload: CodeExchangeRequest, db: Session = Depends(ge
             raise HTTPException(status_code=400, detail="Failed to fetch GitHub user")
         gh_user = user_res.json()
 
-    github_id = str(gh_user["id"])
-    login = gh_user["login"]
-    avatar_url = gh_user.get("avatar_url")
+    return NormalizedUser(id=str(gh_user["id"]), login=gh_user["login"], avatar_url=gh_user.get("avatar_url"))
 
-    _check_allowed(db, github_id, login, avatar_url)
 
-    jwt_token = _mint_token(github_id)
-    return TokenResponse(token=jwt_token, user=UserOut(id=github_id, login=login, avatar=avatar_url))
+async def _google_adapter(code: str, redirect_uri: str | None) -> NormalizedUser:
+    if not redirect_uri:
+        raise HTTPException(status_code=400, detail="redirect_uri is required for Google sign-in")
+
+    async with httpx.AsyncClient() as client:
+        token_res = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "client_id": settings.google_client_id,
+                "client_secret": settings.google_client_secret,
+                "code": code,
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            },
+        )
+        token_data = token_res.json()
+        access_token = token_data.get("access_token")
+        if not access_token:
+            raise HTTPException(status_code=400, detail=token_data.get("error_description", "Google exchange failed"))
+
+        user_res = await client.get(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if user_res.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to fetch Google user")
+        g_user = user_res.json()
+
+    # Google's "sub" is the stable unique account id; there's no GitHub-style
+    # "login" handle, so email is the closest normalized analogue.
+    return NormalizedUser(id=g_user["sub"], login=g_user.get("email", g_user["sub"]), avatar_url=g_user.get("picture"))
+
+
+_PROVIDER_ADAPTERS: dict[str, Callable[[str, str | None], Awaitable[NormalizedUser]]] = {
+    "github": _github_adapter,
+    "google": _google_adapter,
+}
+
+
+def _resolve_auth_user(db: Session, provider: str, normalized: NormalizedUser) -> AuthUser:
+    """Find-or-create the AuthUser row for this (provider, id), applying the
+    same "single owner, then a pending queue" rule the old single-provider
+    GitHub-only logic used — just generalized across providers.
+    """
+    if provider == "github" and settings.allowed_github_username:
+        if normalized.login.lower() != settings.allowed_github_username.lower():
+            raise HTTPException(status_code=403, detail="This account is not authorized for this instance")
+        existing = db.query(AuthUser).filter(AuthUser.provider == provider, AuthUser.id == normalized.id).first()
+        if existing is not None:
+            return existing
+        new_user = AuthUser(
+            id=normalized.id, provider=provider, login=normalized.login,
+            avatar_url=normalized.avatar_url, status="approved",
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        return new_user
+
+    existing = db.query(AuthUser).filter(AuthUser.provider == provider, AuthUser.id == normalized.id).first()
+    if existing is not None:
+        return existing
+
+    # First account ever, on any provider, becomes the approved owner —
+    # matches the old "whoever logs in first" GitHub-only behavior. Every
+    # account after that starts pending until approved (currently: manually,
+    # by updating this row directly — no admin UI yet).
+    no_users_yet = db.query(AuthUser).first() is None
+    new_user = AuthUser(
+        id=normalized.id, provider=provider, login=normalized.login,
+        avatar_url=normalized.avatar_url, status="approved" if no_users_yet else "pending",
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+
+@router.post("/callback/{provider}", response_model=CallbackResponse)
+async def oauth_callback(provider: str, payload: CodeExchangeRequest, db: Session = Depends(get_db)) -> CallbackResponse:
+    adapter = _PROVIDER_ADAPTERS.get(provider)
+    if adapter is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported provider: {provider!r}. Use one of {SUPPORTED_PROVIDERS}.",
+        )
+
+    normalized = await adapter(payload.code, payload.redirect_uri)
+    user = _resolve_auth_user(db, provider, normalized)
+
+    if user.status != "approved":
+        return CallbackResponse(status="pending")
+
+    jwt_token = _mint_token(user.id)
+    return CallbackResponse(
+        status="approved",
+        token=jwt_token,
+        user=UserOut(id=user.id, login=user.login, avatar=user.avatar_url),
+    )
 
 
 @router.get("/me", response_model=UserOut)

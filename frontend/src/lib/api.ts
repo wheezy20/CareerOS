@@ -10,7 +10,7 @@ import type {
   Role, Project, Skill, Course, Achievement, FileEntry, LinkEntry, OtherEntry,
   Application, ProfileInfo, ParsedJob, MatchAnalysis, Template,
   AnalyticsSummary, SkillTrend, ProjectUsage, VelocityPoint,
-  AuthUser, AuthTokenResponse,
+  AuthUser, OAuthProvider, OAuthCallbackResponse,
 } from "./types";
 import { clearToken, getToken } from "./auth";
 
@@ -224,7 +224,9 @@ export const api = {
   async getAnalyticsVelocity(): Promise<VelocityPoint[]> { return fetchJson("GET", "/analytics/velocity"); },
 
   // Auth
-  async exchangeGithubCode(code: string): Promise<AuthTokenResponse> { return fetchJson("POST", "/auth/callback", { code }); },
+  async exchangeOAuthCode(provider: OAuthProvider, code: string, redirectUri: string): Promise<OAuthCallbackResponse> {
+    return fetchJson("POST", `/auth/callback/${provider}`, { code, redirect_uri: redirectUri });
+  },
   async getMe(): Promise<AuthUser> { return fetchJson("GET", "/auth/me"); },
   async logout(): Promise<void> { await fetchJson("POST", "/auth/logout"); },
 };

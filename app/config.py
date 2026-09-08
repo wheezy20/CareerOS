@@ -8,6 +8,8 @@ class Settings(BaseSettings):
 
     github_client_id: str = ""
     github_client_secret: str = ""
+    google_client_id: str = ""
+    google_client_secret: str = ""
     jwt_secret: str = ""
     allowed_github_username: str = ""
 
