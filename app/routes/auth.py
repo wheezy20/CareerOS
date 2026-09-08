@@ -34,6 +34,7 @@ class CodeExchangeRequest(BaseModel):
 class UserOut(BaseModel):
     id: str
     login: str
+    provider: str
     avatar: str | None = None
 
 
@@ -245,7 +246,7 @@ async def oauth_callback(provider: str, payload: CodeExchangeRequest, db: Sessio
     return CallbackResponse(
         status="approved",
         token=jwt_token,
-        user=UserOut(id=user.id, login=user.login, avatar=user.avatar_url),
+        user=UserOut(id=user.id, login=user.login, provider=user.provider, avatar=user.avatar_url),
     )
 
 
@@ -254,7 +255,7 @@ def me(user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db
     owner = db.query(AuthUser).filter(AuthUser.id == user_id).first()
     if owner is None:
         raise HTTPException(status_code=401, detail="User not found")
-    return UserOut(id=owner.id, login=owner.login, avatar=owner.avatar_url)
+    return UserOut(id=owner.id, login=owner.login, provider=owner.provider, avatar=owner.avatar_url)
 
 
 @router.post("/logout")

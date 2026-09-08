@@ -26,6 +26,8 @@ import { api } from "@/lib/api";
 import { clearToken } from "@/lib/auth";
 import type { AuthUser } from "@/lib/types";
 
+const PROVIDER_LABELS: Record<string, string> = { github: "GitHub", google: "Google" };
+
 const items = [
   { title: "Knowledge Base", url: "/knowledge", icon: BookOpen },
   { title: "Templates", url: "/templates", icon: FileText },
@@ -46,6 +48,7 @@ export function AppSidebar() {
 
   const displayName = user?.login || "Signed in";
   const avatarLetter = user?.login ? user.login[0]!.toUpperCase() : "?";
+  const providerLabel = user?.provider ? `${PROVIDER_LABELS[user.provider] ?? user.provider} account` : "";
 
   function handleLogout() {
     api.logout().catch(() => {}); // best-effort — the JWT is stateless, client just drops it
@@ -96,7 +99,7 @@ export function AppSidebar() {
           </div>
           <div className="flex flex-1 flex-col leading-tight overflow-hidden">
             <span className="truncate text-sm font-medium">{displayName}</span>
-            <span className="truncate text-xs text-muted-foreground">GitHub account</span>
+            <span className="truncate text-xs text-muted-foreground">{providerLabel}</span>
           </div>
           <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleLogout} title="Log out">
             <LogOut className="h-4 w-4" />

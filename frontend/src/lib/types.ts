@@ -140,9 +140,9 @@ export type ProjectUsage = { projectId: string; title: string; usageCount: numbe
 
 export type VelocityPoint = { week: string; count: number };
 
-export type AuthUser = { id: string; login: string; avatar?: string };
-
 export type OAuthProvider = "github" | "google";
+
+export type AuthUser = { id: string; login: string; provider: OAuthProvider; avatar?: string };
 
 export type OAuthCallbackResponse =
   | { status: "approved"; token: string; user: AuthUser }
