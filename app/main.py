@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from app.database import init_db
 from app.routes.analytics import router as analytics_router
 from app.routes.applications import router as applications_router
-from app.routes.auth import require_auth, router as auth_router
+from app.routes.auth import get_current_user_id, router as auth_router
 from app.routes.generation import ROOT_DIR, router as generation_router
 from app.routes.job import router as job_router
 from app.routes.knowledge_base import router as knowledge_base_router
@@ -43,7 +43,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-protected = [Depends(require_auth)]
+protected = [Depends(get_current_user_id)]
 
 GENERATED_DIR = ROOT_DIR / "data" / "generated"
 GENERATED_DIR.mkdir(parents=True, exist_ok=True)

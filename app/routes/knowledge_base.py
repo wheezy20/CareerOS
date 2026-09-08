@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Achievement, Course, FileEntry, LinkEntry, OtherEntry, Project, Role, Skill
-from app.routes._shared import current_owner_id
+from app.routes.auth import get_current_user_id
 from app.schemas import (
     AchievementSchema,
     CourseSchema,
@@ -29,12 +29,17 @@ ModelType = TypeVar("ModelType")
 SchemaType = TypeVar("SchemaType")
 
 
-def _upsert_entity(db: Session, model: Type[ModelType], schema: Type[SchemaType], payload: SchemaType) -> ModelType:
+def _upsert_entity(
+    db: Session, model: Type[ModelType], schema: Type[SchemaType], payload: SchemaType, user_id: str
+) -> ModelType:
     data = payload.model_dump(by_alias=False, exclude_none=False)
     entity_id = data.get("id")
 
     if entity_id:
-        obj = db.query(model).filter(model.id == entity_id).first()
+        # Scoped by user_id too, not just id — updating a row that exists but
+        # belongs to someone else 404s exactly like it not existing at all,
+        # rather than either updating it or leaking that it exists.
+        obj = db.query(model).filter(model.id == entity_id, model.user_id == user_id).first()
         if not obj:
             raise HTTPException(status_code=404, detail=f"{model.__name__} not found")
         for key, value in data.items():
@@ -45,7 +50,7 @@ def _upsert_entity(db: Session, model: Type[ModelType], schema: Type[SchemaType]
         return obj
 
     data.pop("id", None)
-    obj = model(user_id=current_owner_id(db), **data)
+    obj = model(user_id=user_id, **data)
     db.add(obj)
     db.commit()
     db.refresh(obj)
@@ -53,18 +58,18 @@ def _upsert_entity(db: Session, model: Type[ModelType], schema: Type[SchemaType]
 
 
 @router.get("/roles", response_model=list[RoleSchema], response_model_by_alias=True)
-def list_roles(db: Session = Depends(get_db)) -> list[Role]:
-    return db.query(Role).all()
+def list_roles(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)) -> list[Role]:
+    return db.query(Role).filter(Role.user_id == user_id).all()
 
 
 @router.post("/roles", response_model=RoleSchema, response_model_by_alias=True)
-def save_role(payload: RoleSchema, db: Session = Depends(get_db)) -> Role:
-    return _upsert_entity(db, Role, RoleSchema, payload)
+def save_role(payload: RoleSchema, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)) -> Role:
+    return _upsert_entity(db, Role, RoleSchema, payload, user_id)
 
 
 @router.delete("/roles/{role_id}", status_code=204)
-def delete_role(role_id: str, db: Session = Depends(get_db)) -> Response:
-    obj = db.query(Role).filter(Role.id == role_id).first()
+def delete_role(role_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)) -> Response:
+    obj = db.query(Role).filter(Role.id == role_id, Role.user_id == user_id).first()
     if obj:
         db.delete(obj)
         db.commit()
@@ -72,18 +77,22 @@ def delete_role(role_id: str, db: Session = Depends(get_db)) -> Response:
 
 
 @router.get("/projects", response_model=list[ProjectSchema], response_model_by_alias=True)
-def list_projects(db: Session = Depends(get_db)) -> list[Project]:
-    return db.query(Project).all()
+def list_projects(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)) -> list[Project]:
+    return db.query(Project).filter(Project.user_id == user_id).all()
 
 
 @router.post("/projects", response_model=ProjectSchema, response_model_by_alias=True)
-def save_project(payload: ProjectSchema, db: Session = Depends(get_db)) -> Project:
-    return _upsert_entity(db, Project, ProjectSchema, payload)
+def save_project(
+    payload: ProjectSchema, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
+) -> Project:
+    return _upsert_entity(db, Project, ProjectSchema, payload, user_id)
 
 
 @router.delete("/projects/{project_id}", status_code=204)
-def delete_project(project_id: str, db: Session = Depends(get_db)) -> Response:
-    obj = db.query(Project).filter(Project.id == project_id).first()
+def delete_project(
+    project_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
+) -> Response:
+    obj = db.query(Project).filter(Project.id == project_id, Project.user_id == user_id).first()
     if obj:
         db.delete(obj)
         db.commit()
@@ -91,18 +100,20 @@ def delete_project(project_id: str, db: Session = Depends(get_db)) -> Response:
 
 
 @router.get("/skills", response_model=list[SkillSchema], response_model_by_alias=True)
-def list_skills(db: Session = Depends(get_db)) -> list[Skill]:
-    return db.query(Skill).all()
+def list_skills(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)) -> list[Skill]:
+    return db.query(Skill).filter(Skill.user_id == user_id).all()
 
 
 @router.post("/skills", response_model=SkillSchema, response_model_by_alias=True)
-def save_skill(payload: SkillSchema, db: Session = Depends(get_db)) -> Skill:
-    return _upsert_entity(db, Skill, SkillSchema, payload)
+def save_skill(
+    payload: SkillSchema, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
+) -> Skill:
+    return _upsert_entity(db, Skill, SkillSchema, payload, user_id)
 
 
 @router.delete("/skills/{skill_id}", status_code=204)
-def delete_skill(skill_id: str, db: Session = Depends(get_db)) -> Response:
-    obj = db.query(Skill).filter(Skill.id == skill_id).first()
+def delete_skill(skill_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)) -> Response:
+    obj = db.query(Skill).filter(Skill.id == skill_id, Skill.user_id == user_id).first()
     if obj:
         db.delete(obj)
         db.commit()
@@ -110,18 +121,22 @@ def delete_skill(skill_id: str, db: Session = Depends(get_db)) -> Response:
 
 
 @router.get("/courses", response_model=list[CourseSchema], response_model_by_alias=True)
-def list_courses(db: Session = Depends(get_db)) -> list[Course]:
-    return db.query(Course).all()
+def list_courses(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)) -> list[Course]:
+    return db.query(Course).filter(Course.user_id == user_id).all()
 
 
 @router.post("/courses", response_model=CourseSchema, response_model_by_alias=True)
-def save_course(payload: CourseSchema, db: Session = Depends(get_db)) -> Course:
-    return _upsert_entity(db, Course, CourseSchema, payload)
+def save_course(
+    payload: CourseSchema, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
+) -> Course:
+    return _upsert_entity(db, Course, CourseSchema, payload, user_id)
 
 
 @router.delete("/courses/{course_id}", status_code=204)
-def delete_course(course_id: str, db: Session = Depends(get_db)) -> Response:
-    obj = db.query(Course).filter(Course.id == course_id).first()
+def delete_course(
+    course_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
+) -> Response:
+    obj = db.query(Course).filter(Course.id == course_id, Course.user_id == user_id).first()
     if obj:
         db.delete(obj)
         db.commit()
@@ -129,18 +144,24 @@ def delete_course(course_id: str, db: Session = Depends(get_db)) -> Response:
 
 
 @router.get("/achievements", response_model=list[AchievementSchema], response_model_by_alias=True)
-def list_achievements(db: Session = Depends(get_db)) -> list[Achievement]:
-    return db.query(Achievement).all()
+def list_achievements(
+    db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
+) -> list[Achievement]:
+    return db.query(Achievement).filter(Achievement.user_id == user_id).all()
 
 
 @router.post("/achievements", response_model=AchievementSchema, response_model_by_alias=True)
-def save_achievement(payload: AchievementSchema, db: Session = Depends(get_db)) -> Achievement:
-    return _upsert_entity(db, Achievement, AchievementSchema, payload)
+def save_achievement(
+    payload: AchievementSchema, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
+) -> Achievement:
+    return _upsert_entity(db, Achievement, AchievementSchema, payload, user_id)
 
 
 @router.delete("/achievements/{achievement_id}", status_code=204)
-def delete_achievement(achievement_id: str, db: Session = Depends(get_db)) -> Response:
-    obj = db.query(Achievement).filter(Achievement.id == achievement_id).first()
+def delete_achievement(
+    achievement_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
+) -> Response:
+    obj = db.query(Achievement).filter(Achievement.id == achievement_id, Achievement.user_id == user_id).first()
     if obj:
         db.delete(obj)
         db.commit()
@@ -148,18 +169,20 @@ def delete_achievement(achievement_id: str, db: Session = Depends(get_db)) -> Re
 
 
 @router.get("/links", response_model=list[LinkEntrySchema], response_model_by_alias=True)
-def list_links(db: Session = Depends(get_db)) -> list[LinkEntry]:
-    return db.query(LinkEntry).all()
+def list_links(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)) -> list[LinkEntry]:
+    return db.query(LinkEntry).filter(LinkEntry.user_id == user_id).all()
 
 
 @router.post("/links", response_model=LinkEntrySchema, response_model_by_alias=True)
-def save_link(payload: LinkEntrySchema, db: Session = Depends(get_db)) -> LinkEntry:
-    return _upsert_entity(db, LinkEntry, LinkEntrySchema, payload)
+def save_link(
+    payload: LinkEntrySchema, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
+) -> LinkEntry:
+    return _upsert_entity(db, LinkEntry, LinkEntrySchema, payload, user_id)
 
 
 @router.delete("/links/{link_id}", status_code=204)
-def delete_link(link_id: str, db: Session = Depends(get_db)) -> Response:
-    obj = db.query(LinkEntry).filter(LinkEntry.id == link_id).first()
+def delete_link(link_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)) -> Response:
+    obj = db.query(LinkEntry).filter(LinkEntry.id == link_id, LinkEntry.user_id == user_id).first()
     if obj:
         db.delete(obj)
         db.commit()
@@ -167,18 +190,22 @@ def delete_link(link_id: str, db: Session = Depends(get_db)) -> Response:
 
 
 @router.get("/others", response_model=list[OtherEntrySchema], response_model_by_alias=True)
-def list_others(db: Session = Depends(get_db)) -> list[OtherEntry]:
-    return db.query(OtherEntry).all()
+def list_others(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)) -> list[OtherEntry]:
+    return db.query(OtherEntry).filter(OtherEntry.user_id == user_id).all()
 
 
 @router.post("/others", response_model=OtherEntrySchema, response_model_by_alias=True)
-def save_other(payload: OtherEntrySchema, db: Session = Depends(get_db)) -> OtherEntry:
-    return _upsert_entity(db, OtherEntry, OtherEntrySchema, payload)
+def save_other(
+    payload: OtherEntrySchema, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
+) -> OtherEntry:
+    return _upsert_entity(db, OtherEntry, OtherEntrySchema, payload, user_id)
 
 
 @router.delete("/others/{other_id}", status_code=204)
-def delete_other(other_id: str, db: Session = Depends(get_db)) -> Response:
-    obj = db.query(OtherEntry).filter(OtherEntry.id == other_id).first()
+def delete_other(
+    other_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
+) -> Response:
+    obj = db.query(OtherEntry).filter(OtherEntry.id == other_id, OtherEntry.user_id == user_id).first()
     if obj:
         db.delete(obj)
         db.commit()
@@ -186,19 +213,23 @@ def delete_other(other_id: str, db: Session = Depends(get_db)) -> Response:
 
 
 @router.get("/files", response_model=list[FileEntrySchema], response_model_by_alias=True)
-def list_files(db: Session = Depends(get_db)) -> list[FileEntry]:
-    return db.query(FileEntry).all()
+def list_files(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)) -> list[FileEntry]:
+    return db.query(FileEntry).filter(FileEntry.user_id == user_id).all()
 
 
 @router.post("/files", response_model=FileEntrySchema, response_model_by_alias=True)
-def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)) -> FileEntry:
+def upload_file(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+) -> FileEntry:
     data = file.file.read()
     suffix = Path(file.filename or "file").suffix or ".bin"
     object_path = f"files/{uuid.uuid4().hex[:8]}{suffix}"
     upload_bytes(object_path, data, content_type=file.content_type)
 
     payload = FileEntry(
-        user_id=current_owner_id(db),
+        user_id=user_id,
         name=file.filename or "upload",
         size=len(data),
         type=file.content_type or "application/octet-stream",
@@ -212,8 +243,10 @@ def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)) -> 
 
 
 @router.get("/files/{file_id}/download")
-def download_file(file_id: str, db: Session = Depends(get_db)) -> dict[str, str]:
-    obj = db.query(FileEntry).filter(FileEntry.id == file_id).first()
+def download_file(
+    file_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
+) -> dict[str, str]:
+    obj = db.query(FileEntry).filter(FileEntry.id == file_id, FileEntry.user_id == user_id).first()
     if obj is None:
         raise HTTPException(status_code=404, detail="File not found")
     try:
@@ -224,8 +257,8 @@ def download_file(file_id: str, db: Session = Depends(get_db)) -> dict[str, str]
 
 
 @router.delete("/files/{file_id}", status_code=204)
-def delete_file(file_id: str, db: Session = Depends(get_db)) -> Response:
-    obj = db.query(FileEntry).filter(FileEntry.id == file_id).first()
+def delete_file(file_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)) -> Response:
+    obj = db.query(FileEntry).filter(FileEntry.id == file_id, FileEntry.user_id == user_id).first()
     if obj:
         db.delete(obj)
         db.commit()

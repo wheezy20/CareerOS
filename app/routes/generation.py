@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Achievement, Course, GeneratedCv, ParsedJob, Profile, Project, Role, Skill, Template
-from app.routes._shared import current_owner_id
+from app.routes.auth import get_current_user_id
 from app.schemas import ParsedJobSchema
 from app.services.document_service import (
     generate_cold_email,
@@ -67,20 +67,22 @@ GENERATED_DIR = ROOT_DIR / "data" / "generated"
 GENERATED_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _find_job(db: Session, job_id: str) -> ParsedJob:
-    job = db.query(ParsedJob).filter(ParsedJob.id == job_id).first()
+def _find_job(db: Session, job_id: str, user_id: str) -> ParsedJob:
+    job = db.query(ParsedJob).filter(ParsedJob.id == job_id, ParsedJob.user_id == user_id).first()
     if job is None:
         raise HTTPException(status_code=404, detail="Parsed job not found")
     return job
 
 
-def _find_profile_context(db: Session) -> dict[str, Any]:
+def _find_profile_context(db: Session, user_id: str) -> dict[str, Any]:
+    # Profile stays a global "me" singleton for this phase (see
+    # app/routes/profile.py) — everything else is scoped per user.
     profile = db.query(Profile).filter(Profile.id == "me").first()
-    roles = db.query(Role).all()
-    projects = db.query(Project).all()
-    skills = db.query(Skill).all()
-    courses = db.query(Course).all()
-    achievements = db.query(Achievement).all()
+    roles = db.query(Role).filter(Role.user_id == user_id).all()
+    projects = db.query(Project).filter(Project.user_id == user_id).all()
+    skills = db.query(Skill).filter(Skill.user_id == user_id).all()
+    courses = db.query(Course).filter(Course.user_id == user_id).all()
+    achievements = db.query(Achievement).filter(Achievement.user_id == user_id).all()
     return _build_user_profile_json(
         profile=profile,
         roles=roles,
@@ -91,11 +93,11 @@ def _find_profile_context(db: Session) -> dict[str, Any]:
     )
 
 
-def _latest_template(db: Session, kind: str) -> Template | None:
+def _latest_template(db: Session, kind: str, user_id: str) -> Template | None:
     # Template.id is a random UUID hex, not time-ordered, so sorting by it does not
     # give the most recent upload. Row insertion order (SQLite's implicit rowid,
     # returned when no ORDER BY is applied) does.
-    templates = db.query(Template).filter(Template.type == kind).all()
+    templates = db.query(Template).filter(Template.type == kind, Template.user_id == user_id).all()
     return templates[-1] if templates else None
 
 
@@ -138,16 +140,20 @@ def _write_temp_template(data: bytes, filename: str = "") -> str:
 
 
 @router.post("/generate/cv")
-def generate_cv(payload: dict[str, str], db: Session = Depends(get_db)) -> dict:
+def generate_cv(
+    payload: dict[str, str],
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+) -> dict:
     job_id = payload.get("jobId") or payload.get("job_id")
     if not job_id:
         raise HTTPException(status_code=400, detail="jobId is required")
 
-    job = _find_job(db, job_id)
-    profile_context = _find_profile_context(db)
+    job = _find_job(db, job_id, user_id)
+    profile_context = _find_profile_context(db, user_id)
     parsed_job = ParsedJobSchema.model_validate(job).model_dump(by_alias=True)
 
-    tmpl = _latest_template(db, "cv")
+    tmpl = _latest_template(db, "cv", user_id)
     template_bytes = _resolve_template_path(tmpl)
     template_path = _write_temp_template(template_bytes, tmpl.file_name if tmpl else "")
     try:
@@ -184,9 +190,9 @@ def generate_cv(payload: dict[str, str], db: Session = Depends(get_db)) -> dict:
         logger.warning("Failed to upload/sign generated CV pdf: %s", exc)
         pdf_url = None
 
-    project_ids = [project.id for project in db.query(Project).all()]
+    project_ids = [project.id for project in db.query(Project).filter(Project.user_id == user_id).all()]
     db.add(GeneratedCv(
-        user_id=current_owner_id(db),
+        user_id=user_id,
         job_id=job_id,
         project_ids=project_ids,
         generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
@@ -202,16 +208,20 @@ def generate_cv(payload: dict[str, str], db: Session = Depends(get_db)) -> dict:
 
 
 @router.post("/generate/cover-letter")
-def generate_cover_letter_endpoint(payload: dict[str, str], db: Session = Depends(get_db)) -> dict:
+def generate_cover_letter_endpoint(
+    payload: dict[str, str],
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+) -> dict:
     job_id = payload.get("jobId") or payload.get("job_id")
     if not job_id:
         raise HTTPException(status_code=400, detail="jobId is required")
 
-    job = _find_job(db, job_id)
-    profile_context = _find_profile_context(db)
+    job = _find_job(db, job_id, user_id)
+    profile_context = _find_profile_context(db, user_id)
     parsed_job = ParsedJobSchema.model_validate(job).model_dump(by_alias=True)
 
-    tmpl = _latest_template(db, "cover_letter")
+    tmpl = _latest_template(db, "cover_letter", user_id)
     template_bytes = _resolve_template_path(tmpl)
     template_path = _write_temp_template(template_bytes, tmpl.file_name if tmpl else "")
     docx_output_path = ""
@@ -273,13 +283,17 @@ def generate_cover_letter_endpoint(payload: dict[str, str], db: Session = Depend
 
 
 @router.post("/generate/cold-email")
-def generate_cold_email_endpoint(payload: dict[str, str], db: Session = Depends(get_db)) -> dict[str, str]:
+def generate_cold_email_endpoint(
+    payload: dict[str, str],
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+) -> dict[str, str]:
     job_id = payload.get("jobId") or payload.get("job_id")
     if not job_id:
         raise HTTPException(status_code=400, detail="jobId is required")
 
-    job = _find_job(db, job_id)
-    profile_context = _find_profile_context(db)
+    job = _find_job(db, job_id, user_id)
+    profile_context = _find_profile_context(db, user_id)
     parsed_job = ParsedJobSchema.model_validate(job).model_dump(by_alias=True)
 
     try:

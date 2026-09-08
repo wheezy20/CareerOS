@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ParsedJob, Profile, Project, Role, Skill
-from app.routes._shared import current_owner_id
+from app.routes.auth import get_current_user_id
 from app.schemas import MatchAnalysisSchema, ParsedJobSchema
 from app.services.claude_service import (
     build_profile_context,
@@ -23,9 +23,9 @@ router = APIRouter(tags=["job"])
 logger = logging.getLogger(__name__)
 
 
-def _save_parsed_job(db: Session, parsed: ParsedJobSchema) -> ParsedJob:
+def _save_parsed_job(db: Session, parsed: ParsedJobSchema, user_id: str) -> ParsedJob:
     record = ParsedJob(
-        user_id=current_owner_id(db),
+        user_id=user_id,
         title=parsed.title,
         company=parsed.company,
         location=parsed.location,
@@ -47,7 +47,11 @@ def _save_parsed_job(db: Session, parsed: ParsedJobSchema) -> ParsedJob:
 
 
 @router.post("/job/parse/pdf", response_model=ParsedJobSchema, response_model_by_alias=True)
-async def parse_job_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)) -> ParsedJob:
+async def parse_job_pdf(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+) -> ParsedJob:
     contents = await file.read()
     try:
         text = extract_pdf_text(contents)
@@ -59,11 +63,15 @@ async def parse_job_pdf(file: UploadFile = File(...), db: Session = Depends(get_
     # deterministic keyword-scan ParsedJobSchema that still carries the real
     # extracted text, so the caller always gets something usable.
     parsed = parse_job_description(text)
-    return _save_parsed_job(db, parsed)
+    return _save_parsed_job(db, parsed, user_id)
 
 
 @router.post("/job/parse/image", response_model=ParsedJobSchema, response_model_by_alias=True)
-async def parse_job_image_endpoint(file: UploadFile = File(...), db: Session = Depends(get_db)) -> ParsedJob:
+async def parse_job_image_endpoint(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+) -> ParsedJob:
     contents = await file.read()
     try:
         media_type = validate_image(contents)
@@ -75,11 +83,15 @@ async def parse_job_image_endpoint(file: UploadFile = File(...), db: Session = D
     # fallback ParsedJobSchema with is_fallback set, so the caller always gets
     # something usable (surfaced to the user by the frontend as a warning).
     parsed = parse_job_image(contents, media_type)
-    return _save_parsed_job(db, parsed)
+    return _save_parsed_job(db, parsed, user_id)
 
 
 @router.post("/job/parse/url", response_model=ParsedJobSchema, response_model_by_alias=True)
-def parse_job_url(payload: dict[str, str], db: Session = Depends(get_db)) -> ParsedJob:
+def parse_job_url(
+    payload: dict[str, str],
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+) -> ParsedJob:
     url = payload.get("url", "")
     if not url:
         raise HTTPException(status_code=400, detail="url is required")
@@ -91,29 +103,41 @@ def parse_job_url(payload: dict[str, str], db: Session = Depends(get_db)) -> Par
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     parsed = parse_job_description(text)
-    return _save_parsed_job(db, parsed)
+    return _save_parsed_job(db, parsed, user_id)
 
 
 @router.post("/job/parse/text", response_model=ParsedJobSchema, response_model_by_alias=True)
-def parse_job_text_endpoint(payload: dict[str, str], db: Session = Depends(get_db)) -> ParsedJob:
+def parse_job_text_endpoint(
+    payload: dict[str, str],
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+) -> ParsedJob:
     text = payload.get("text", "")
     if not text:
         raise HTTPException(status_code=400, detail="text is required")
 
     parsed = parse_job_description(text)
-    return _save_parsed_job(db, parsed)
+    return _save_parsed_job(db, parsed, user_id)
 
 
 @router.post("/job/{job_id}/analyze", response_model=MatchAnalysisSchema, response_model_by_alias=True)
-def analyze_job(job_id: str, db: Session = Depends(get_db)) -> MatchAnalysisSchema:
-    job = db.query(ParsedJob).filter(ParsedJob.id == job_id).first()
+def analyze_job(
+    job_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+) -> MatchAnalysisSchema:
+    job = db.query(ParsedJob).filter(ParsedJob.id == job_id, ParsedJob.user_id == user_id).first()
     if job is None:
         raise HTTPException(status_code=404, detail="Parsed job not found")
 
+    # Profile stays a global "me" singleton for this phase (not yet per-user
+    # — see app/routes/profile.py). Role/Project/Skill are scoped: unscoped
+    # here would leak another user's skills/experience into this user's
+    # match score and gap analysis, not just into a list they can see.
     profile = db.query(Profile).filter(Profile.id == "me").first()
-    roles = db.query(Role).all()
-    projects = db.query(Project).all()
-    skills = db.query(Skill).all()
+    roles = db.query(Role).filter(Role.user_id == user_id).all()
+    projects = db.query(Project).filter(Project.user_id == user_id).all()
+    skills = db.query(Skill).filter(Skill.user_id == user_id).all()
     profile_context = build_profile_context(profile=profile, roles=roles, projects=projects, skills=skills)
 
     parsed_job = ParsedJobSchema.model_validate(job).model_dump(by_alias=True)

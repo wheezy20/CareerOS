@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Template
-from app.routes._shared import current_owner_id
+from app.routes.auth import get_current_user_id
 from app.schemas import TemplateSchema
 from app.services.storage_service import generate_signed_url, upload_bytes
 
@@ -23,8 +23,8 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.get("", response_model=list[TemplateSchema], response_model_by_alias=True)
-def list_templates(db: Session = Depends(get_db)) -> list[Template]:
-    return db.query(Template).all()
+def list_templates(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)) -> list[Template]:
+    return db.query(Template).filter(Template.user_id == user_id).all()
 
 
 @router.post("", response_model=TemplateSchema, response_model_by_alias=True)
@@ -32,6 +32,7 @@ def upload_template(
     kind: str = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
 ) -> Template:
     if kind not in {"cv", "cover_letter"}:
         raise HTTPException(status_code=400, detail="kind must be 'cv' or 'cover_letter'")
@@ -42,7 +43,7 @@ def upload_template(
 
     uploaded_at = datetime.utcnow().strftime("%Y-%m-%d")
     record = Template(
-        user_id=current_owner_id(db),
+        user_id=user_id,
         type=kind,
         file_name=file.filename or object_path,
         uploaded_at=uploaded_at,
@@ -55,8 +56,10 @@ def upload_template(
 
 
 @router.get("/{template_id}/download")
-def download_template(template_id: str, db: Session = Depends(get_db)) -> dict[str, str]:
-    obj = db.query(Template).filter(Template.id == template_id).first()
+def download_template(
+    template_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
+) -> dict[str, str]:
+    obj = db.query(Template).filter(Template.id == template_id, Template.user_id == user_id).first()
     if obj is None:
         raise HTTPException(status_code=404, detail="Template not found")
     try:
@@ -67,8 +70,10 @@ def download_template(template_id: str, db: Session = Depends(get_db)) -> dict[s
 
 
 @router.delete("/{template_id}", status_code=204)
-def delete_template(template_id: str, db: Session = Depends(get_db)) -> Response:
-    obj = db.query(Template).filter(Template.id == template_id).first()
+def delete_template(
+    template_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
+) -> Response:
+    obj = db.query(Template).filter(Template.id == template_id, Template.user_id == user_id).first()
     if obj:
         db.delete(obj)
         db.commit()

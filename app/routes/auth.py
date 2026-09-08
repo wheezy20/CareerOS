@@ -70,15 +70,9 @@ def extract_token(request: Request) -> str | None:
     return request.cookies.get("careeros_token")
 
 
-def get_current_user(request: Request) -> dict:
-    token = extract_token(request)
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return decode_token(token)
-
-
-def require_auth(request: Request) -> None:
-    """FastAPI dependency gate for protected routers.
+def get_current_user_id(request: Request, db: Session = Depends(get_db)) -> str:
+    """The single auth dependency every protected route depends on, directly
+    or via the router-level gate in app/main.py.
 
     Deliberately a dependency, not raw ASGI middleware: raising HTTPException
     here goes through FastAPI's normal exception handling, which sits inside
@@ -86,10 +80,30 @@ def require_auth(request: Request) -> None:
     A short-circuiting middleware placed outside CORSMiddleware would return
     a 401 with no CORS headers, which browsers surface as an opaque network
     error instead of a readable 401.
+
+    Re-checks the AuthUser row fresh from the DB on every call — never trusts
+    status from the JWT payload itself, since the JWT is only re-minted at
+    login. Without this DB lookup, revoking a user's approval would have no
+    effect until their existing 7-day token expired. FastAPI caches this
+    dependency's result per request (same callable), so declaring it both at
+    router level and on individual route handlers costs one DB query, not two.
     """
     token = extract_token(request)
-    if not token or try_decode_token(token) is None:
+    if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
+
+    payload = decode_token(token)
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    user = db.query(AuthUser).filter(AuthUser.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=401, detail="Account no longer exists")
+    if user.status != "approved":
+        raise HTTPException(status_code=403, detail="Account is not approved")
+
+    return user.id
 
 
 @dataclass
@@ -236,8 +250,8 @@ async def oauth_callback(provider: str, payload: CodeExchangeRequest, db: Sessio
 
 
 @router.get("/me", response_model=UserOut)
-def me(user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> UserOut:
-    owner = db.query(AuthUser).filter(AuthUser.id == user["sub"]).first()
+def me(user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db)) -> UserOut:
+    owner = db.query(AuthUser).filter(AuthUser.id == user_id).first()
     if owner is None:
         raise HTTPException(status_code=401, detail="User not found")
     return UserOut(id=owner.id, login=owner.login, avatar=owner.avatar_url)
