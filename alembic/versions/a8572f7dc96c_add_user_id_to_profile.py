@@ -16,6 +16,13 @@ down_revision: Union[str, Sequence[str], None] = 'e71cf7652e9a'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
+# Known-correct owner of the single pre-existing profile row, for
+# environments where auth_users already has more than one row (e.g. Neon,
+# where a Google test account was created during live multi-provider
+# testing) and the single-row inference below can't be used. Verified by
+# the person running this migration, not inferred.
+KNOWN_PROFILE_OWNER_ID = "59140446"
+
 
 def upgrade() -> None:
     bind = op.get_bind()
@@ -38,12 +45,21 @@ def upgrade() -> None:
     if profile_rows:
         auth_users = sa.table("auth_users", sa.column("id", sa.String), sa.column("login", sa.String))
         owner_rows = bind.execute(sa.select(auth_users.c.id, auth_users.c.login)).fetchall()
-        if len(owner_rows) != 1:
-            raise RuntimeError(
-                "Expected exactly one auth_users row to backfill profile.user_id from, "
-                f"found {len(owner_rows)}: {[(row.id, row.login) for row in owner_rows]}"
-            )
-        owner_id = owner_rows[0].id
+        if len(owner_rows) == 1:
+            owner_id = owner_rows[0].id
+        else:
+            # More than one auth_users row (or zero) — can't infer the owner
+            # automatically. Fall back to the known-correct id, but only if
+            # it's actually among the rows found; otherwise still refuse to
+            # guess, same as before.
+            known_ids = {row.id for row in owner_rows}
+            if KNOWN_PROFILE_OWNER_ID not in known_ids:
+                raise RuntimeError(
+                    f"Expected {KNOWN_PROFILE_OWNER_ID!r} to be among the auth_users rows, "
+                    f"found {len(owner_rows)}: {[(row.id, row.login) for row in owner_rows]}. "
+                    "Review before backfilling profile.user_id."
+                )
+            owner_id = KNOWN_PROFILE_OWNER_ID
         bind.execute(sa.text("UPDATE profile SET user_id = :owner_id WHERE user_id IS NULL"), {"owner_id": owner_id})
 
     # Step 3: enforce NOT NULL + uniqueness (one profile per user) + the FK.
