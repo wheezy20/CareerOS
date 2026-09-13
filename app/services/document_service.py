@@ -19,7 +19,6 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt
-from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 from reportlab.lib.colors import black
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
@@ -304,18 +303,6 @@ def _looks_like_structure(text: str) -> bool:
     if any(marker in lowered for marker in ["sincerely", "best", "regards", "kind regards", "thanks", "thank you", "signature"]):
         return True
     return len(text.split()) <= 4 and not any(marker in lowered for marker in [".", "!", "?"])
-
-
-def _copy_paragraph(src_paragraph: Paragraph, dst_doc: Document) -> None:
-    new_paragraph = dst_doc.add_paragraph()
-    new_paragraph.style = src_paragraph.style
-    for run in src_paragraph.runs:
-        new_run = new_paragraph.add_run(run.text)
-        new_run.bold = run.bold
-        new_run.italic = run.italic
-        new_run.underline = run.underline
-        new_run.font.name = run.font.name
-        new_run.font.size = run.font.size
 
 
 def _build_fallback_cover_letter(user_profile_json: dict, parsed_job: dict) -> str:
@@ -1007,50 +994,45 @@ def generate_cover_letter_content(user_profile_json: dict, parsed_job: dict, tem
         return _build_fallback_cover_letter(user_profile_json, parsed_job)
 
 
-def generate_cover_letter(
-    user_profile_json: dict,
-    parsed_job: dict,
-    template_path: str,
-    content: str,
-    output_path: str | None = None,
-) -> str:
+def generate_cover_letter(name: str, contact: str, content: str, output_path: str | None = None) -> str:
+    """Build a cover letter DOCX from scratch, mirroring render_cover_letter_html/
+    render_cover_letter_pdf's structure exactly: header (name + contact),
+    "Dear Hiring Manager,", the body paragraphs, then "Sincerely,\\n{name}"."""
     output = Path(output_path) if output_path else Path(f"/tmp/cover_letter_{uuid.uuid4().hex[:8]}.docx")
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    template_doc = load_template_document(template_path) if template_path.lower().endswith(".docx") else Document()
-
-    paragraphs = list(template_doc.paragraphs)
-    if not paragraphs:
-        doc = Document()
-        doc.add_paragraph(content)
-        doc.save(str(output))
-        return str(output)
-
-    body_start = None
-    body_end = None
-    for idx, paragraph in enumerate(paragraphs):
-        text = paragraph.text.strip().lower()
-        if body_start is None and any(marker in text for marker in ["dear", "hello", "to whom"]):
-            body_start = idx + 1
-            continue
-        if body_end is None and any(marker in text for marker in ["sincerely", "best", "regards", "kind regards", "thanks", "thank you", "signature"]):
-            body_end = idx
-            break
-
-    if body_start is None:
-        body_start = 0
-    if body_end is None:
-        body_end = len(paragraphs)
-
     doc = Document()
-    for idx in range(0, body_start):
-        _copy_paragraph(paragraphs[idx], doc)
+    for section in doc.sections:
+        section.top_margin = Inches(0.5)
+        section.bottom_margin = Inches(0.5)
+        section.left_margin = Inches(0.5)
+        section.right_margin = Inches(0.5)
 
-    for paragraph_text in [part.strip() for part in content.split("\n\n") if part.strip()]:
+    normal_style = doc.styles["Normal"]
+    normal_style.font.name = "Times New Roman"
+    normal_style.font.size = Pt(11)
+
+    name_para = doc.add_paragraph()
+    name_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    name_run = name_para.add_run(name or "")
+    name_run.bold = True
+    name_run.font.size = Pt(20)
+
+    contact_para = doc.add_paragraph()
+    contact_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    contact_para.paragraph_format.space_after = Pt(16)
+    contact_run = contact_para.add_run(contact or "")
+    contact_run.font.size = Pt(10)
+
+    doc.add_paragraph("Dear Hiring Manager,")
+
+    for paragraph_text in [part.strip() for part in (content or "").split("\n\n") if part.strip()]:
         doc.add_paragraph(paragraph_text)
 
-    for idx in range(body_end, len(paragraphs)):
-        _copy_paragraph(paragraphs[idx], doc)
+    signoff_para = doc.add_paragraph()
+    signoff_run = signoff_para.add_run("Sincerely,")
+    signoff_run.add_break()
+    signoff_para.add_run(name or "")
 
     doc.save(str(output))
     return str(output)

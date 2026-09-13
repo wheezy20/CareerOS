@@ -251,7 +251,7 @@ def generate_cover_letter_endpoint(
         docx_tmp = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
         docx_tmp.close()
         docx_output_path = docx_tmp.name
-        generate_cover_letter(profile_context, parsed_job, template_path, content, docx_output_path)
+        generate_cover_letter(profile.get("name", ""), contact, content, docx_output_path)
         docx_bytes = Path(docx_output_path).read_bytes()
     finally:
         if template_path:
