@@ -35,7 +35,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from app.models import Achievement, Course, ParsedJob, Profile, Project, Role, Skill, Template
+from app.models import Achievement, Course, Education, ParsedJob, Profile, Project, Role, Skill, Template
 from app.schemas import ParsedJobSchema
 from app.services.claude_service import CLAUDE_MODEL_GENERATION, call_claude
 from app.services.error_handlers import (
@@ -211,6 +211,7 @@ def _build_user_profile_json(
     skills: list[Skill],
     courses: list[Course] | None = None,
     achievements: list[Achievement] | None = None,
+    education: list[Education] | None = None,
 ) -> dict[str, Any]:
     return {
         "profile": {
@@ -253,6 +254,19 @@ def _build_user_profile_json(
                 "learnings": course.learnings,
             }
             for course in (courses or [])
+        ],
+        "education": [
+            {
+                "institution": entry.institution,
+                "degree": entry.degree,
+                "fieldOfStudy": entry.field_of_study,
+                "startDate": entry.start_date,
+                "endDate": entry.end_date,
+                "location": entry.location,
+                "gpa": entry.gpa,
+                "highlights": entry.highlights,
+            }
+            for entry in (education or [])
         ],
         "achievements": [
             {
@@ -429,10 +443,24 @@ def _fallback_cv_structured(user_profile_json: dict) -> dict:
         for project in user_profile_json.get("projects", [])
     ]
 
+    education = [
+        {
+            "school": entry.get("institution", ""),
+            "degree": (
+                f"{entry.get('degree', '')}, {entry.get('fieldOfStudy')}"
+                if entry.get("fieldOfStudy")
+                else entry.get("degree", "")
+            ),
+            "dates": f"{entry.get('startDate', '')} - {entry.get('endDate') or 'Present'}",
+            "location": entry.get("location", ""),
+        }
+        for entry in user_profile_json.get("education", [])
+    ]
+
     return {
         "name": profile.get("name", ""),
         "contact": contact,
-        "education": [],
+        "education": education,
         "skills": skills_by_category,
         "experience": experience,
         "projects": projects,

@@ -15,7 +15,7 @@ from google.cloud import storage
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Achievement, Course, GeneratedCv, ParsedJob, Profile, Project, Role, Skill, Template
+from app.models import Achievement, Course, Education, GeneratedCv, ParsedJob, Profile, Project, Role, Skill, Template
 from app.routes.auth import get_current_user_id
 from app.schemas import ParsedJobSchema
 from app.services.document_service import (
@@ -81,6 +81,7 @@ def _find_profile_context(db: Session, user_id: str) -> dict[str, Any]:
     skills = db.query(Skill).filter(Skill.user_id == user_id).all()
     courses = db.query(Course).filter(Course.user_id == user_id).all()
     achievements = db.query(Achievement).filter(Achievement.user_id == user_id).all()
+    education = db.query(Education).filter(Education.user_id == user_id).all()
     return _build_user_profile_json(
         profile=profile,
         roles=roles,
@@ -88,6 +89,7 @@ def _find_profile_context(db: Session, user_id: str) -> dict[str, Any]:
         skills=skills,
         courses=courses,
         achievements=achievements,
+        education=education,
     )
 
 

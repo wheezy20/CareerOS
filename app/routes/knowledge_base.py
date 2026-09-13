@@ -9,11 +9,12 @@ from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, Fil
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Achievement, Course, FileEntry, LinkEntry, OtherEntry, Project, Role, Skill
+from app.models import Achievement, Course, Education, FileEntry, LinkEntry, OtherEntry, Project, Role, Skill
 from app.routes.auth import get_current_user_id
 from app.schemas import (
     AchievementSchema,
     CourseSchema,
+    EducationSchema,
     FileEntrySchema,
     LinkEntrySchema,
     OtherEntrySchema,
@@ -137,6 +138,29 @@ def delete_course(
     course_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
 ) -> Response:
     obj = db.query(Course).filter(Course.id == course_id, Course.user_id == user_id).first()
+    if obj:
+        db.delete(obj)
+        db.commit()
+    return Response(status_code=204)
+
+
+@router.get("/education", response_model=list[EducationSchema], response_model_by_alias=True)
+def list_education(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)) -> list[Education]:
+    return db.query(Education).filter(Education.user_id == user_id).all()
+
+
+@router.post("/education", response_model=EducationSchema, response_model_by_alias=True)
+def save_education(
+    payload: EducationSchema, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
+) -> Education:
+    return _upsert_entity(db, Education, EducationSchema, payload, user_id)
+
+
+@router.delete("/education/{education_id}", status_code=204)
+def delete_education(
+    education_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)
+) -> Response:
+    obj = db.query(Education).filter(Education.id == education_id, Education.user_id == user_id).first()
     if obj:
         db.delete(obj)
         db.commit()

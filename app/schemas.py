@@ -57,6 +57,18 @@ class CourseSchema(CamelModel):
     grade: Optional[str] = None
 
 
+class EducationSchema(CamelModel):
+    id: Optional[str] = None
+    institution: str
+    degree: str
+    field_of_study: Optional[str] = None
+    start_date: str
+    end_date: Optional[str] = None
+    location: Optional[str] = None
+    gpa: Optional[str] = None
+    highlights: Optional[str] = None
+
+
 class AchievementSchema(CamelModel):
     id: Optional[str] = None
     title: str

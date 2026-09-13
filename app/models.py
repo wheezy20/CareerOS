@@ -67,6 +67,21 @@ class Course(Base):
     grade = Column(String, nullable=True)
 
 
+class Education(Base):
+    __tablename__ = "education"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    user_id = Column(String, ForeignKey("auth_users.id"), nullable=False, index=True)
+    institution = Column(String, nullable=False)
+    degree = Column(String, nullable=False)
+    field_of_study = Column(String, nullable=True)
+    start_date = Column(String, nullable=False)
+    end_date = Column(String, nullable=True)
+    location = Column(String, nullable=True)
+    gpa = Column(String, nullable=True)
+    highlights = Column(Text, nullable=True)
+
+
 class Achievement(Base):
     __tablename__ = "achievements"
 

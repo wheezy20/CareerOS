@@ -7,7 +7,7 @@
  */
 import * as mock from "./mock-data";
 import type {
-  Role, Project, Skill, Course, Achievement, FileEntry, LinkEntry, OtherEntry,
+  Role, Project, Skill, Course, Education, Achievement, FileEntry, LinkEntry, OtherEntry,
   Application, ApplicationFromPipeline, CvLinks, ProfileInfo, ParsedJob, MatchAnalysis, Template,
   AnalyticsSummary, SkillTrend, ProjectUsage, VelocityPoint,
   AuthUser, OAuthProvider, OAuthCallbackResponse,
@@ -89,6 +89,15 @@ export const api = {
   },
   async deleteCourse(id_: string): Promise<void> {
     return USE_MOCKS ? delay(undefined) : fetchJson("DELETE", `/knowledge-base/courses/${id_}`);
+  },
+
+  // Education
+  async listEducation(): Promise<Education[]> { return USE_MOCKS ? delay([]) : fetchJson("GET", "/knowledge-base/education"); },
+  async saveEducation(e: Omit<Education, "id"> & { id?: string }): Promise<Education> {
+    return USE_MOCKS ? delay({ ...e, id: e.id ?? id() } as Education) : fetchJson("POST", "/knowledge-base/education", e);
+  },
+  async deleteEducation(id_: string): Promise<void> {
+    return USE_MOCKS ? delay(undefined) : fetchJson("DELETE", `/knowledge-base/education/${id_}`);
   },
 
   // Achievements

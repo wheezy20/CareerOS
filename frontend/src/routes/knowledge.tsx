@@ -13,9 +13,9 @@ import { Slider } from "@/components/ui/slider";
 import { PageHeader, EmptyState } from "@/components/page-header";
 import { api } from "@/lib/api";
 import { getToken } from "@/lib/auth";
-import type { Role, Project, Skill, Course, Achievement, FileEntry, LinkEntry, OtherEntry } from "@/lib/types";
+import type { Role, Project, Skill, Course, Education, Achievement, FileEntry, LinkEntry, OtherEntry } from "@/lib/types";
 import {
-  Plus, Pencil, Trash2, Briefcase, Code, Sparkles, GraduationCap,
+  Plus, Pencil, Trash2, Briefcase, Code, Sparkles, GraduationCap, Landmark,
   Trophy, Files, Link as LinkIcon, X, Upload, Download, MoreHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -45,6 +45,7 @@ function KnowledgePage() {
           <TabsTrigger value="projects"><Code className="mr-1.5 h-3.5 w-3.5" />Projects</TabsTrigger>
           <TabsTrigger value="skills"><Sparkles className="mr-1.5 h-3.5 w-3.5" />Skills</TabsTrigger>
           <TabsTrigger value="courses"><GraduationCap className="mr-1.5 h-3.5 w-3.5" />Courses</TabsTrigger>
+          <TabsTrigger value="education"><Landmark className="mr-1.5 h-3.5 w-3.5" />Education</TabsTrigger>
           <TabsTrigger value="achievements"><Trophy className="mr-1.5 h-3.5 w-3.5" />Achievements</TabsTrigger>
           <TabsTrigger value="files"><Files className="mr-1.5 h-3.5 w-3.5" />Files</TabsTrigger>
           <TabsTrigger value="links"><LinkIcon className="mr-1.5 h-3.5 w-3.5" />Links</TabsTrigger>
@@ -55,6 +56,7 @@ function KnowledgePage() {
         <TabsContent value="projects"><ProjectsTab /></TabsContent>
         <TabsContent value="skills"><SkillsTab /></TabsContent>
         <TabsContent value="courses"><CoursesTab /></TabsContent>
+        <TabsContent value="education"><EducationTab /></TabsContent>
         <TabsContent value="achievements"><AchievementsTab /></TabsContent>
         <TabsContent value="files"><FilesTab /></TabsContent>
         <TabsContent value="links"><LinksTab /></TabsContent>
@@ -409,6 +411,74 @@ function CoursesTab() {
                 <Button variant="ghost" size="icon" onClick={() => api.deleteCourse(c.id).then(() => setItems((p) => p.filter((x) => x.id !== c.id)))}><Trash2 className="h-4 w-4" /></Button>
               </div>
               <p className="mt-2 text-sm">{c.learnings}</p>
+            </CardContent></Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Education ----------
+const EMPTY_EDUCATION: Education = {
+  id: "", institution: "", degree: "", fieldOfStudy: "", startDate: "", endDate: "",
+  location: "", gpa: "", highlights: "",
+};
+
+function EducationTab() {
+  const [items, setItems] = useState<Education[]>([]);
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState<Education>(EMPTY_EDUCATION);
+  useEffect(() => { api.listEducation().then(setItems); }, []);
+  function save() {
+    api.saveEducation(f).then((s) => { setItems((p) => [s, ...p]); toast.success("Education added"); setOpen(false); setF(EMPTY_EDUCATION); });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild><Button><Plus className="h-4 w-4" />Add education</Button></DialogTrigger>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
+            <DialogHeader><DialogTitle>Add education</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div><Label>Institution</Label><Input placeholder="e.g. University of Toronto" value={f.institution} onChange={(e) => setF({ ...f, institution: e.target.value })} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Degree</Label><Input placeholder="e.g. BSc Computer Science" value={f.degree} onChange={(e) => setF({ ...f, degree: e.target.value })} /></div>
+                <div><Label>Field of study (optional)</Label><Input placeholder="e.g. Data Science" value={f.fieldOfStudy ?? ""} onChange={(e) => setF({ ...f, fieldOfStudy: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Start</Label><Input type="month" value={f.startDate} onChange={(e) => setF({ ...f, startDate: e.target.value })} /></div>
+                <div><Label>End (blank = present)</Label><Input type="month" value={f.endDate ?? ""} onChange={(e) => setF({ ...f, endDate: e.target.value || null })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Location (optional)</Label><Input placeholder="e.g. Toronto, ON" value={f.location ?? ""} onChange={(e) => setF({ ...f, location: e.target.value })} /></div>
+                <div><Label>GPA (optional)</Label><Input placeholder="e.g. 3.8/4.0" value={f.gpa ?? ""} onChange={(e) => setF({ ...f, gpa: e.target.value })} /></div>
+              </div>
+              <div><Label>Highlights (optional)</Label><Textarea rows={3} placeholder="e.g. Relevant coursework, honors, thesis" value={f.highlights ?? ""} onChange={(e) => setF({ ...f, highlights: e.target.value })} /></div>
+            </div>
+            <DialogFooter><Button onClick={save} disabled={!f.institution || !f.degree || !f.startDate}>Save</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+      {items.length === 0 ? (
+        <EmptyState icon={Landmark} title="No education yet" description="Add your degrees so they can flow into any CV." />
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2">
+          {items.map((e) => (
+            <Card key={e.id}><CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-medium">{e.degree}{e.fieldOfStudy && `, ${e.fieldOfStudy}`}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {e.institution} · {e.startDate} — {e.endDate || "Present"}
+                    {e.location && ` · ${e.location}`}
+                    {e.gpa && ` · GPA ${e.gpa}`}
+                  </p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => api.deleteEducation(e.id).then(() => setItems((p) => p.filter((x) => x.id !== e.id)))}><Trash2 className="h-4 w-4" /></Button>
+              </div>
+              {e.highlights && <p className="mt-2 text-sm">{e.highlights}</p>}
             </CardContent></Card>
           ))}
         </div>

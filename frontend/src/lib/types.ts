@@ -41,6 +41,18 @@ export type Course = {
   grade?: string;
 };
 
+export type Education = {
+  id: string;
+  institution: string;
+  degree: string;
+  fieldOfStudy?: string;
+  startDate: string;
+  endDate?: string | null;
+  location?: string;
+  gpa?: string;
+  highlights?: string;
+};
+
 export type Achievement = {
   id: string;
   title: string;

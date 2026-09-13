@@ -109,6 +109,9 @@ Roles:
 Projects:
 {projects}
 
+Education:
+{education}
+
 Courses:
 {courses}
 
@@ -130,7 +133,7 @@ Template structure (use this as your guide for section order — do not invent s
 
 Your task:
 1. Use the template structure above as your guide for section order — don't invent sections it doesn't have, don't drop sections it does have; use empty lists for sections with no content.
-2. Pull all real content ONLY from the User's Profile above (roles, projects, skills, courses, achievements). Never invent facts, companies, dates, or metrics.
+2. Pull all real content ONLY from the User's Profile above (roles, projects, education, skills, courses, achievements). Never invent facts, companies, dates, or metrics.
 3. Tailor the content to the Target Job (title, required skills, keywords, responsibilities) — emphasize the most relevant roles, projects, and skills.
 4. If the Target Job's domain doesn't closely match the user's roles/projects, explicitly reframe the closest matching experience in terms of transferable skills relevant to the job, rather than forcing in an unrelated bullet.
 5. Limit each role's bullets to at most 3 — select only the strongest and most job-relevant achievements. Do not pad with weaker bullets to reach 3.
@@ -173,6 +176,7 @@ def build_cv_structured_prompt(user_profile_json: dict, parsed_job: dict, templa
         profile_contact=json.dumps(user_profile_json.get("profile", {}), indent=2),
         roles=json.dumps(user_profile_json.get("roles", []), indent=2),
         projects=json.dumps(user_profile_json.get("projects", []), indent=2),
+        education=json.dumps(user_profile_json.get("education", []), indent=2),
         courses=json.dumps(user_profile_json.get("courses", []), indent=2),
         achievements=json.dumps(user_profile_json.get("achievements", []), indent=2),
         skills=json.dumps(user_profile_json.get("skills", []), indent=2),
