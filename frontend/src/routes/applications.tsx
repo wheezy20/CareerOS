@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PageHeader, EmptyState } from "@/components/page-header";
 import { api } from "@/lib/api";
 import type { Application, CvLinks } from "@/lib/types";
-import { Briefcase, ChevronDown, ChevronRight, Download, FileText, Loader2, Mail, Plus, Search, Sparkles } from "lucide-react";
+import { Briefcase, ChevronDown, ChevronRight, Download, FileText, Loader2, Mail, Pencil, Plus, Search, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/applications")({
@@ -42,6 +42,7 @@ function ApplicationsPage() {
   const [status, setStatus] = useState<string>("all");
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Application | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => { api.listApplications().then(setItems); }, []);
@@ -61,8 +62,8 @@ function ApplicationsPage() {
         if (idx >= 0) { const next = [...prev]; next[idx] = saved; return next; }
         return [saved, ...prev];
       });
-      toast.success("Application added");
-      setOpen(false);
+      toast.success(editing ? "Application updated" : "Application added");
+      setOpen(false); setEditing(null);
     });
   }
 
@@ -82,7 +83,7 @@ function ApplicationsPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setEditing(null); }}>
         <PageHeader
           title="Applications"
           description="Everything you've sent, filtered and searchable."
@@ -131,8 +132,9 @@ function ApplicationsPage() {
                   <TableHead>Company</TableHead>
                   <TableHead>Applied</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>CV</TableHead>
-                  <TableHead className="text-right">Match</TableHead>
+                  <TableHead className="min-w-[80px] text-right">CV</TableHead>
+                  <TableHead className="min-w-[72px] text-right">Match</TableHead>
+                  <TableHead className="w-8" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -156,8 +158,18 @@ function ApplicationsPage() {
                         <TableCell>{a.company}</TableCell>
                         <TableCell className="text-muted-foreground">{a.dateApplied}</TableCell>
                         <TableCell><Badge className={STATUS_STYLES[a.status]}>{a.status}</Badge></TableCell>
-                        <TableCell className="text-muted-foreground">{a.cvVersion}</TableCell>
-                        <TableCell className="text-right font-medium text-primary">{a.matchScore ? `${a.matchScore}%` : "—"}</TableCell>
+                        <TableCell className="min-w-[80px] text-right text-muted-foreground">{a.cvVersion || "—"}</TableCell>
+                        <TableCell className={`min-w-[72px] text-right ${a.matchScore ? "font-medium text-primary" : "text-muted-foreground"}`}>
+                          {a.matchScore ? `${a.matchScore}%` : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost" size="icon"
+                            onClick={(e) => { e.stopPropagation(); setEditing(a); setOpen(true); }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                       {isExpanded && <ApplicationDetailRow application={a} />}
                     </Fragment>
@@ -168,7 +180,7 @@ function ApplicationsPage() {
           </CardContent></Card>
         )}
 
-        <ApplicationDialog onSave={onSave} />
+        <ApplicationDialog application={editing} onSave={onSave} />
       </Dialog>
     </div>
   );
@@ -193,7 +205,7 @@ function ApplicationDetailRow({ application }: { application: Application }) {
 
   return (
     <TableRow className="bg-muted/30 hover:bg-muted/30">
-      <TableCell colSpan={7} className="p-4">
+      <TableCell colSpan={8} className="p-4">
         {!hasContent ? (
           <p className="text-sm text-muted-foreground">No generated documents linked to this application.</p>
         ) : (
@@ -246,16 +258,17 @@ function ApplicationDetailRow({ application }: { application: Application }) {
   );
 }
 
-function ApplicationDialog({ onSave }: { onSave: (a: Application) => void }) {
+function ApplicationDialog({ application, onSave }: { application: Application | null; onSave: (a: Application) => void }) {
   const empty: Application = {
     id: "", jobTitle: "", company: "", dateApplied: new Date().toISOString().slice(0, 10),
     status: "Applied", cvVersion: "", notes: "", matchScore: undefined,
   };
-  const [f, setF] = useState<Application>(empty);
+  const [f, setF] = useState<Application>(application ?? empty);
+  useEffect(() => { if (application) setF(application); }, [application]);
 
   return (
     <DialogContent className="max-w-lg">
-      <DialogHeader><DialogTitle>Add application</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle>{application ? "Edit application" : "Add application"}</DialogTitle></DialogHeader>
       <div className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div><Label>Job title</Label><Input value={f.jobTitle} onChange={(e) => setF({ ...f, jobTitle: e.target.value })} /></div>
