@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,8 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader, EmptyState } from "@/components/page-header";
 import { api } from "@/lib/api";
-import type { Application } from "@/lib/types";
-import { Briefcase, Download, Plus, Search } from "lucide-react";
+import type { Application, CvLinks } from "@/lib/types";
+import { Briefcase, ChevronDown, ChevronRight, Download, FileText, Loader2, Mail, Plus, Search, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/applications")({
@@ -42,6 +42,7 @@ function ApplicationsPage() {
   const [status, setStatus] = useState<string>("all");
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => { api.listApplications().then(setItems); }, []);
 
@@ -125,6 +126,7 @@ function ApplicationsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8" />
                   <TableHead>Job</TableHead>
                   <TableHead>Company</TableHead>
                   <TableHead>Applied</TableHead>
@@ -134,16 +136,33 @@ function ApplicationsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((a) => (
-                  <TableRow key={a.id}>
-                    <TableCell className="font-medium">{a.jobTitle}</TableCell>
-                    <TableCell>{a.company}</TableCell>
-                    <TableCell className="text-muted-foreground">{a.dateApplied}</TableCell>
-                    <TableCell><Badge className={STATUS_STYLES[a.status]}>{a.status}</Badge></TableCell>
-                    <TableCell className="text-muted-foreground">{a.cvVersion}</TableCell>
-                    <TableCell className="text-right font-medium text-primary">{a.matchScore ? `${a.matchScore}%` : "—"}</TableCell>
-                  </TableRow>
-                ))}
+                {filtered.map((a) => {
+                  const expandable = !!a.parsedJobId;
+                  const isExpanded = expandedId === a.id;
+                  return (
+                    <Fragment key={a.id}>
+                      <TableRow
+                        className={expandable ? "cursor-pointer" : undefined}
+                        onClick={() => expandable && setExpandedId(isExpanded ? null : a.id)}
+                      >
+                        <TableCell>
+                          {expandable && (isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          ))}
+                        </TableCell>
+                        <TableCell className="font-medium">{a.jobTitle}</TableCell>
+                        <TableCell>{a.company}</TableCell>
+                        <TableCell className="text-muted-foreground">{a.dateApplied}</TableCell>
+                        <TableCell><Badge className={STATUS_STYLES[a.status]}>{a.status}</Badge></TableCell>
+                        <TableCell className="text-muted-foreground">{a.cvVersion}</TableCell>
+                        <TableCell className="text-right font-medium text-primary">{a.matchScore ? `${a.matchScore}%` : "—"}</TableCell>
+                      </TableRow>
+                      {isExpanded && <ApplicationDetailRow application={a} />}
+                    </Fragment>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent></Card>
@@ -152,6 +171,78 @@ function ApplicationsPage() {
         <ApplicationDialog onSave={onSave} />
       </Dialog>
     </div>
+  );
+}
+
+function ApplicationDetailRow({ application }: { application: Application }) {
+  const [cvLinks, setCvLinks] = useState<CvLinks | null>(null);
+  const [loadingCv, setLoadingCv] = useState(false);
+  const [cvError, setCvError] = useState(false);
+
+  useEffect(() => {
+    if (!application.generatedCvId) return;
+    setLoadingCv(true);
+    setCvError(false);
+    api.getApplicationCvLinks(application.id)
+      .then(setCvLinks)
+      .catch(() => setCvError(true))
+      .finally(() => setLoadingCv(false));
+  }, [application.id, application.generatedCvId]);
+
+  const hasContent = application.generatedCvId || application.coverLetterText || application.coldEmailText;
+
+  return (
+    <TableRow className="bg-muted/30 hover:bg-muted/30">
+      <TableCell colSpan={7} className="p-4">
+        {!hasContent ? (
+          <p className="text-sm text-muted-foreground">No generated documents linked to this application.</p>
+        ) : (
+          <div className="space-y-3">
+            {application.generatedCvId && (
+              <div>
+                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <FileText className="h-3.5 w-3.5" />CV
+                </p>
+                {loadingCv ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                ) : cvError || !cvLinks || (!cvLinks.docxUrl && !cvLinks.pdfUrl) ? (
+                  <p className="text-sm text-muted-foreground">CV files unavailable</p>
+                ) : (
+                  <div className="flex gap-2">
+                    {cvLinks.docxUrl && (
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={cvLinks.docxUrl} target="_blank" rel="noopener noreferrer"><Download className="h-3.5 w-3.5" />DOCX</a>
+                      </Button>
+                    )}
+                    {cvLinks.pdfUrl && (
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={cvLinks.pdfUrl} target="_blank" rel="noopener noreferrer"><Download className="h-3.5 w-3.5" />PDF</a>
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {application.coverLetterText && (
+              <div>
+                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <Mail className="h-3.5 w-3.5" />Cover letter
+                </p>
+                <p className="whitespace-pre-wrap rounded-lg bg-background p-3 text-sm">{application.coverLetterText}</p>
+              </div>
+            )}
+            {application.coldEmailText && (
+              <div>
+                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <Sparkles className="h-3.5 w-3.5" />Cold email
+                </p>
+                <p className="whitespace-pre-wrap rounded-lg bg-background p-3 text-sm">{application.coldEmailText}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </TableCell>
+    </TableRow>
   );
 }
 

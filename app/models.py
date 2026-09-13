@@ -126,6 +126,10 @@ class Application(Base):
     cv_version = Column(String, nullable=False, default="")
     notes = Column(Text, nullable=False, default="")
     match_score = Column(Integer, nullable=True)
+    parsed_job_id = Column(String, ForeignKey("parsed_jobs.id"), nullable=True)
+    generated_cv_id = Column(String, ForeignKey("generated_cvs.id"), nullable=True)
+    cover_letter_text = Column(Text, nullable=True)
+    cold_email_text = Column(Text, nullable=True)
 
 
 class Template(Base):
@@ -177,6 +181,8 @@ class GeneratedCv(Base):
     job_id = Column(String, nullable=False)
     project_ids = Column(JSON, nullable=False, default=list)
     generated_at = Column(String, nullable=False)
+    docx_path = Column(String, nullable=True)
+    pdf_path = Column(String, nullable=True)
 
 
 class AuthUser(Base):

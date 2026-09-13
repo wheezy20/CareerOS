@@ -8,7 +8,7 @@
 import * as mock from "./mock-data";
 import type {
   Role, Project, Skill, Course, Achievement, FileEntry, LinkEntry, OtherEntry,
-  Application, ProfileInfo, ParsedJob, MatchAnalysis, Template,
+  Application, ApplicationFromPipeline, CvLinks, ProfileInfo, ParsedJob, MatchAnalysis, Template,
   AnalyticsSummary, SkillTrend, ProjectUsage, VelocityPoint,
   AuthUser, OAuthProvider, OAuthCallbackResponse,
 } from "./types";
@@ -183,14 +183,14 @@ export const api = {
     return USE_MOCKS ? delay(mock.mockMatch, 600) : fetchJson("POST", `/job/${jobId}/analyze`);
   },
 
-  async generateCV(jobId: string): Promise<{ html: string; docxUrl: string | null; pdfUrl: string | null; version: string }> {
+  async generateCV(jobId: string): Promise<{ id: string; html: string; docxUrl: string | null; pdfUrl: string | null; version: string }> {
     return USE_MOCKS
-      ? delay({ html: "<p>Mock CV preview</p>", docxUrl: null, pdfUrl: null, version: `v${Math.floor(Math.random() * 90) + 10}` }, 1400)
+      ? delay({ id: id(), html: "<p>Mock CV preview</p>", docxUrl: null, pdfUrl: null, version: `v${Math.floor(Math.random() * 90) + 10}` }, 1400)
       : fetchJson("POST", "/generate/cv", { jobId });
   },
-  async generateCoverLetter(jobId: string): Promise<{ html: string; docxUrl: string | null; pdfUrl: string | null; version: string }> {
+  async generateCoverLetter(jobId: string): Promise<{ html: string; content: string; docxUrl: string | null; pdfUrl: string | null; version: string }> {
     return USE_MOCKS
-      ? delay({ html: "<p>Mock cover letter preview</p>", docxUrl: null, pdfUrl: null, version: `v${Math.floor(Math.random() * 90) + 10}` }, 1200)
+      ? delay({ html: "<p>Mock cover letter preview</p>", content: "Mock cover letter preview", docxUrl: null, pdfUrl: null, version: `v${Math.floor(Math.random() * 90) + 10}` }, 1200)
       : fetchJson("POST", "/generate/cover-letter", { jobId });
   },
   async generateColdEmail(jobId: string): Promise<{ text: string }> {
@@ -209,6 +209,12 @@ export const api = {
   },
   async deleteApplication(id_: string): Promise<void> {
     return USE_MOCKS ? delay(undefined) : fetchJson("DELETE", `/applications/${id_}`);
+  },
+  async saveApplicationFromPipeline(a: ApplicationFromPipeline): Promise<Application> {
+    return fetchJson("POST", "/applications/from-pipeline", a);
+  },
+  async getApplicationCvLinks(id_: string): Promise<CvLinks> {
+    return fetchJson("GET", `/applications/${id_}/cv-links`);
   },
 
   // Profile

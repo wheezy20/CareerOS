@@ -1,19 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { PageHeader } from "@/components/page-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/lib/api";
-import type { ParsedJob, MatchAnalysis } from "@/lib/types";
+import type { Application, ParsedJob, MatchAnalysis } from "@/lib/types";
 import {
   Upload, LinkIcon, ClipboardPaste, Loader2, Sparkles, FileText, Mail,
   Download, Copy, RefreshCw, CheckCircle2, ChevronDown, AlertTriangle,
+  BookmarkPlus, ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -244,10 +248,12 @@ function StepReview({ parsed, match, onNext, onBack }: {
 }
 
 function StepGenerate({ parsed, onBack }: { parsed: ParsedJob; onBack: () => void }) {
-  const [cv, setCv] = useState<{ html: string; docxUrl: string | null; pdfUrl: string | null; version: string } | null>(null);
-  const [cl, setCl] = useState<{ html: string; docxUrl: string | null; pdfUrl: string | null; version: string } | null>(null);
+  const [cv, setCv] = useState<{ id: string; html: string; docxUrl: string | null; pdfUrl: string | null; version: string } | null>(null);
+  const [cl, setCl] = useState<{ html: string; content: string; docxUrl: string | null; pdfUrl: string | null; version: string } | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saved, setSaved] = useState<Application | null>(null);
 
   function gen(kind: string, run: () => Promise<void>) {
     setBusy(kind); run().finally(() => setBusy(null));
@@ -330,10 +336,105 @@ function StepGenerate({ parsed, onBack }: { parsed: ParsedJob; onBack: () => voi
         </CardContent></Card>
       )}
 
+      {(cv || cl || email) && (
+        <Card><CardContent className="p-5">
+          {saved ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-success">
+                <CheckCircle2 className="h-4 w-4" />
+                <span className="text-sm font-medium">Saved to Applications</span>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/applications"><ExternalLink className="h-3.5 w-3.5" />View it</Link>
+              </Button>
+            </div>
+          ) : (
+            <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-medium">Ready to track this application?</h3>
+                  <p className="text-xs text-muted-foreground">Save the job, CV, cover letter, and cold email together.</p>
+                </div>
+                <DialogTrigger asChild>
+                  <Button size="sm"><BookmarkPlus className="h-4 w-4" />Save to Applications</Button>
+                </DialogTrigger>
+              </div>
+              <SaveToApplicationsDialog
+                parsed={parsed}
+                cv={cv}
+                cl={cl}
+                email={email}
+                onSaved={(app) => { setSaved(app); setSaveOpen(false); }}
+              />
+            </Dialog>
+          )}
+        </CardContent></Card>
+      )}
+
       <div className="flex justify-start">
         <Button variant="outline" onClick={onBack}>Back to review</Button>
       </div>
     </div>
+  );
+}
+
+function SaveToApplicationsDialog({ parsed, cv, cl, email, onSaved }: {
+  parsed: ParsedJob;
+  cv: { id: string } | null;
+  cl: { content: string } | null;
+  email: string | null;
+  onSaved: (a: Application) => void;
+}) {
+  const [jobTitle, setJobTitle] = useState(parsed.title);
+  const [company, setCompany] = useState(parsed.company);
+  const [dateApplied, setDateApplied] = useState(new Date().toISOString().slice(0, 10));
+  const [status, setStatus] = useState<Application["status"]>("Applied");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  function handleSave() {
+    setSaving(true);
+    api.saveApplicationFromPipeline({
+      parsedJobId: parsed.id,
+      generatedCvId: cv?.id,
+      coverLetterText: cl?.content,
+      coldEmailText: email ?? undefined,
+      jobTitle, company, dateApplied, status, notes,
+    })
+      .then((app) => { toast.success("Saved to Applications"); onSaved(app); })
+      .catch((err) => toast.error(err?.message || "Couldn't save application"))
+      .finally(() => setSaving(false));
+  }
+
+  return (
+    <DialogContent className="max-w-lg">
+      <DialogHeader><DialogTitle>Save to Applications</DialogTitle></DialogHeader>
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div><Label>Job title</Label><Input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} /></div>
+          <div><Label>Company</Label><Input value={company} onChange={(e) => setCompany(e.target.value)} /></div>
+          <div><Label>Date applied</Label><Input type="date" value={dateApplied} onChange={(e) => setDateApplied(e.target.value)} /></div>
+          <div>
+            <Label>Status</Label>
+            <Select value={status} onValueChange={(v) => setStatus(v as Application["status"])}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(["Applied", "Interview", "Rejected", "Offer", "Ghosted"] as const).map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div><Label>Notes (optional)</Label><Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+      </div>
+      <DialogFooter>
+        <Button onClick={handleSave} disabled={!jobTitle || !company || !dateApplied || saving}>
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <BookmarkPlus className="h-4 w-4" />}
+          Save
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   );
 }
 

@@ -101,6 +101,27 @@ class ApplicationSchema(CamelModel):
     cv_version: str = ""
     notes: str = ""
     match_score: Optional[int] = None
+    parsed_job_id: Optional[str] = None
+    generated_cv_id: Optional[str] = None
+    cover_letter_text: Optional[str] = None
+    cold_email_text: Optional[str] = None
+
+
+class ApplicationFromPipelineSchema(CamelModel):
+    parsed_job_id: str
+    generated_cv_id: Optional[str] = None
+    cover_letter_text: Optional[str] = None
+    cold_email_text: Optional[str] = None
+    job_title: str
+    company: str
+    date_applied: str
+    status: Literal["Applied", "Interview", "Rejected", "Offer", "Ghosted"] = "Applied"
+    notes: str = ""
+
+
+class CvLinksSchema(CamelModel):
+    docx_url: Optional[str] = None
+    pdf_url: Optional[str] = None
 
 
 class ProfileSchema(CamelModel):

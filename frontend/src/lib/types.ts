@@ -115,7 +115,25 @@ export type Application = {
   cvVersion: string;
   notes: string;
   matchScore?: number;
+  parsedJobId?: string | null;
+  generatedCvId?: string | null;
+  coverLetterText?: string | null;
+  coldEmailText?: string | null;
 };
+
+export type ApplicationFromPipeline = {
+  parsedJobId: string;
+  generatedCvId?: string;
+  coverLetterText?: string;
+  coldEmailText?: string;
+  jobTitle: string;
+  company: string;
+  dateApplied: string;
+  status: Application["status"];
+  notes?: string;
+};
+
+export type CvLinks = { docxUrl: string | null; pdfUrl: string | null };
 
 export type ProfileInfo = {
   name: string;

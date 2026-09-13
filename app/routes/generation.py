@@ -171,33 +171,40 @@ def generate_cv(
     pdf_bytes = render_cv_pdf(structured)
 
     docx_url = None
+    docx_object_path = f"generated/cv_{job_id}_{uuid.uuid4().hex[:8]}.docx"
     try:
-        docx_object_path = f"generated/cv_{job_id}_{uuid.uuid4().hex[:8]}.docx"
         upload_bytes(docx_object_path, docx_bytes)
         docx_url = generate_signed_url(docx_object_path)
     except Exception as exc:
         logger.warning("Failed to upload/sign generated CV docx: %s", exc)
         docx_url = None
+        docx_object_path = None
 
     pdf_url = None
+    pdf_object_path = f"generated/cv_{job_id}_{uuid.uuid4().hex[:8]}.pdf"
     try:
-        pdf_object_path = f"generated/cv_{job_id}_{uuid.uuid4().hex[:8]}.pdf"
         upload_bytes(pdf_object_path, pdf_bytes)
         pdf_url = generate_signed_url(pdf_object_path)
     except Exception as exc:
         logger.warning("Failed to upload/sign generated CV pdf: %s", exc)
         pdf_url = None
+        pdf_object_path = None
 
     project_ids = [project.id for project in db.query(Project).filter(Project.user_id == user_id).all()]
-    db.add(GeneratedCv(
+    generated_cv = GeneratedCv(
         user_id=user_id,
         job_id=job_id,
         project_ids=project_ids,
         generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-    ))
+        docx_path=docx_object_path,
+        pdf_path=pdf_object_path,
+    )
+    db.add(generated_cv)
     db.commit()
+    db.refresh(generated_cv)
 
     return {
+        "id": generated_cv.id,
         "html": cv_html,
         "docxUrl": docx_url,
         "pdfUrl": pdf_url,
@@ -274,6 +281,7 @@ def generate_cover_letter_endpoint(
 
     return {
         "html": cl_html,
+        "content": content,
         "docxUrl": docx_url,
         "pdfUrl": pdf_url,
         "version": f"v2-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}",
