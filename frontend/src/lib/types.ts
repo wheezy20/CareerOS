@@ -46,7 +46,7 @@ export type Education = {
   institution: string;
   degree: string;
   fieldOfStudy?: string;
-  startDate: string;
+  startDate?: string | null;
   endDate?: string | null;
   location?: string;
   gpa?: string;

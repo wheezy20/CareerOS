@@ -75,7 +75,7 @@ class Education(Base):
     institution = Column(String, nullable=False)
     degree = Column(String, nullable=False)
     field_of_study = Column(String, nullable=True)
-    start_date = Column(String, nullable=False)
+    start_date = Column(String, nullable=True)
     end_date = Column(String, nullable=True)
     location = Column(String, nullable=True)
     gpa = Column(String, nullable=True)

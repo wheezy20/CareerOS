@@ -448,7 +448,7 @@ function EducationTab() {
                 <div><Label>Field of study (optional)</Label><Input placeholder="e.g. Data Science" value={f.fieldOfStudy ?? ""} onChange={(e) => setF({ ...f, fieldOfStudy: e.target.value })} /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><Label>Start</Label><Input type="month" value={f.startDate} onChange={(e) => setF({ ...f, startDate: e.target.value })} /></div>
+                <div><Label>Start (optional)</Label><Input type="month" value={f.startDate ?? ""} onChange={(e) => setF({ ...f, startDate: e.target.value || null })} /></div>
                 <div><Label>End (blank = present)</Label><Input type="month" value={f.endDate ?? ""} onChange={(e) => setF({ ...f, endDate: e.target.value || null })} /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -457,7 +457,7 @@ function EducationTab() {
               </div>
               <div><Label>Highlights (optional)</Label><Textarea rows={3} placeholder="e.g. Relevant coursework, honors, thesis" value={f.highlights ?? ""} onChange={(e) => setF({ ...f, highlights: e.target.value })} /></div>
             </div>
-            <DialogFooter><Button onClick={save} disabled={!f.institution || !f.degree || !f.startDate}>Save</Button></DialogFooter>
+            <DialogFooter><Button onClick={save} disabled={!f.institution || !f.degree}>Save</Button></DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
@@ -465,13 +465,20 @@ function EducationTab() {
         <EmptyState icon={Landmark} title="No education yet" description="Add your degrees so they can flow into any CV." />
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
-          {items.map((e) => (
+          {items.map((e) => {
+            const dateRange = e.startDate && e.endDate
+              ? `${e.startDate} — ${e.endDate}`
+              : e.startDate
+              ? `${e.startDate} — Present`
+              : e.endDate || null;
+            return (
             <Card key={e.id}><CardContent className="p-5">
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-medium">{e.degree}{e.fieldOfStudy && `, ${e.fieldOfStudy}`}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {e.institution} · {e.startDate} — {e.endDate || "Present"}
+                    {e.institution}
+                    {dateRange && ` · ${dateRange}`}
                     {e.location && ` · ${e.location}`}
                     {e.gpa && ` · GPA ${e.gpa}`}
                   </p>
@@ -480,7 +487,8 @@ function EducationTab() {
               </div>
               {e.highlights && <p className="mt-2 text-sm">{e.highlights}</p>}
             </CardContent></Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

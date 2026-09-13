@@ -62,7 +62,7 @@ class EducationSchema(CamelModel):
     institution: str
     degree: str
     field_of_study: Optional[str] = None
-    start_date: str
+    start_date: Optional[str] = None
     end_date: Optional[str] = None
     location: Optional[str] = None
     gpa: Optional[str] = None

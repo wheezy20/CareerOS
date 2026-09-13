@@ -422,6 +422,18 @@ def _fallback_cv_structured(user_profile_json: dict) -> dict:
         ) if part
     )
 
+    def _format_date_range(start: str | None, end: str | None) -> str:
+        """Never renders the literal string "None" — start/end may be
+        explicitly None (an ongoing role/degree), not just absent, so a
+        plain f-string or .get(key, "") default isn't enough."""
+        start = start or ""
+        end = end or ""
+        if start and end:
+            return f"{start} - {end}"
+        if start:
+            return f"{start} - Present"
+        return end
+
     skills_by_category: dict[str, list[str]] = {}
     for skill in user_profile_json.get("skills", []):
         category = skill.get("category") or "Skills"
@@ -431,7 +443,7 @@ def _fallback_cv_structured(user_profile_json: dict) -> dict:
         {
             "role": role.get("title", ""),
             "company": role.get("company", ""),
-            "dates": f"{role.get('startDate', '')} - {role.get('endDate', '')}",
+            "dates": _format_date_range(role.get("startDate"), role.get("endDate")),
             "location": "",
             "bullets": role.get("achievements") or ([role["description"]] if role.get("description") else []),
         }
@@ -451,7 +463,7 @@ def _fallback_cv_structured(user_profile_json: dict) -> dict:
                 if entry.get("fieldOfStudy")
                 else entry.get("degree", "")
             ),
-            "dates": f"{entry.get('startDate', '')} - {entry.get('endDate') or 'Present'}",
+            "dates": _format_date_range(entry.get("startDate"), entry.get("endDate")),
             "location": entry.get("location", ""),
         }
         for entry in user_profile_json.get("education", [])
