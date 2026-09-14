@@ -59,7 +59,7 @@ function PipelinePage() {
           <StepReview parsed={parsed} match={match} onNext={() => setStep(3)} onBack={() => setStep(1)} />
         )}
         {step === 3 && parsed && (
-          <StepGenerate parsed={parsed} onBack={() => setStep(2)} />
+          <StepGenerate parsed={parsed} match={match} onBack={() => setStep(2)} />
         )}
       </div>
     </div>
@@ -247,7 +247,7 @@ function StepReview({ parsed, match, onNext, onBack }: {
   );
 }
 
-function StepGenerate({ parsed, onBack }: { parsed: ParsedJob; onBack: () => void }) {
+function StepGenerate({ parsed, match, onBack }: { parsed: ParsedJob; match: MatchAnalysis | null; onBack: () => void }) {
   const [cv, setCv] = useState<{ id: string; html: string; docxUrl: string | null; pdfUrl: string | null; version: string } | null>(null);
   const [cl, setCl] = useState<{ html: string; content: string; docxUrl: string | null; pdfUrl: string | null; version: string } | null>(null);
   const [email, setEmail] = useState<string | null>(null);
@@ -364,6 +364,7 @@ function StepGenerate({ parsed, onBack }: { parsed: ParsedJob; onBack: () => voi
                 cv={cv}
                 cl={cl}
                 email={email}
+                matchScore={match?.score}
                 onSaved={(app) => { setSaved(app); setSaveOpen(false); }}
               />
             </Dialog>
@@ -378,11 +379,12 @@ function StepGenerate({ parsed, onBack }: { parsed: ParsedJob; onBack: () => voi
   );
 }
 
-function SaveToApplicationsDialog({ parsed, cv, cl, email, onSaved }: {
+function SaveToApplicationsDialog({ parsed, cv, cl, email, matchScore, onSaved }: {
   parsed: ParsedJob;
   cv: { id: string } | null;
   cl: { content: string } | null;
   email: string | null;
+  matchScore: number | undefined;
   onSaved: (a: Application) => void;
 }) {
   const [jobTitle, setJobTitle] = useState(parsed.title);
@@ -399,6 +401,7 @@ function SaveToApplicationsDialog({ parsed, cv, cl, email, onSaved }: {
       generatedCvId: cv?.id,
       coverLetterText: cl?.content,
       coldEmailText: email ?? undefined,
+      matchScore,
       jobTitle, company, dateApplied, status, notes,
     })
       .then((app) => { toast.success("Saved to Applications"); onSaved(app); })

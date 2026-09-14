@@ -143,6 +143,7 @@ export type ApplicationFromPipeline = {
   dateApplied: string;
   status: Application["status"];
   notes?: string;
+  matchScore?: number;
 };
 
 export type CvLinks = { docxUrl: string | null; pdfUrl: string | null };

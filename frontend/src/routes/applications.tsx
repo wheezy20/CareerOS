@@ -158,7 +158,7 @@ function ApplicationsPage() {
                         <TableCell>{a.company}</TableCell>
                         <TableCell className="text-muted-foreground">{a.dateApplied}</TableCell>
                         <TableCell><Badge className={STATUS_STYLES[a.status]}>{a.status}</Badge></TableCell>
-                        <TableCell className="min-w-[80px] text-right text-muted-foreground">{a.cvVersion || "—"}</TableCell>
+                        <CvCell application={a} />
                         <TableCell className={`min-w-[72px] text-right ${a.matchScore ? "font-medium text-primary" : "text-muted-foreground"}`}>
                           {a.matchScore ? `${a.matchScore}%` : "—"}
                         </TableCell>
@@ -186,20 +186,60 @@ function ApplicationsPage() {
   );
 }
 
-function ApplicationDetailRow({ application }: { application: Application }) {
-  const [cvLinks, setCvLinks] = useState<CvLinks | null>(null);
-  const [loadingCv, setLoadingCv] = useState(false);
-  const [cvError, setCvError] = useState(false);
+function useCvLinks(applicationId: string, generatedCvId: string | null | undefined) {
+  const [links, setLinks] = useState<CvLinks | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (!application.generatedCvId) return;
-    setLoadingCv(true);
-    setCvError(false);
-    api.getApplicationCvLinks(application.id)
-      .then(setCvLinks)
-      .catch(() => setCvError(true))
-      .finally(() => setLoadingCv(false));
-  }, [application.id, application.generatedCvId]);
+    if (!generatedCvId) return;
+    setLoading(true);
+    setError(false);
+    api.getApplicationCvLinks(applicationId)
+      .then(setLinks)
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, [applicationId, generatedCvId]);
+
+  return { links, loading, error };
+}
+
+function CvCell({ application }: { application: Application }) {
+  const { links, loading } = useCvLinks(application.id, application.generatedCvId);
+
+  if (!application.generatedCvId) {
+    return (
+      <TableCell className="min-w-[80px] text-right text-muted-foreground">
+        {application.cvVersion || "—"}
+      </TableCell>
+    );
+  }
+
+  const url = links?.pdfUrl || links?.docxUrl;
+
+  return (
+    <TableCell className="min-w-[80px] text-right">
+      {loading ? (
+        <Loader2 className="ml-auto h-4 w-4 animate-spin text-muted-foreground" />
+      ) : url ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center gap-1 text-primary hover:underline"
+        >
+          <Download className="h-3.5 w-3.5" />
+        </a>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      )}
+    </TableCell>
+  );
+}
+
+function ApplicationDetailRow({ application }: { application: Application }) {
+  const { links: cvLinks, loading: loadingCv, error: cvError } = useCvLinks(application.id, application.generatedCvId);
 
   const hasContent = application.generatedCvId || application.coverLetterText || application.coldEmailText;
 

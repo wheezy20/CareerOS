@@ -129,6 +129,7 @@ class ApplicationFromPipelineSchema(CamelModel):
     date_applied: str
     status: Literal["Applied", "Interview", "Rejected", "Offer", "Ghosted"] = "Applied"
     notes: str = ""
+    match_score: Optional[int] = None
 
 
 class CvLinksSchema(CamelModel):

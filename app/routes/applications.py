@@ -82,6 +82,7 @@ def save_application_from_pipeline(
         date_applied=payload.date_applied,
         status=payload.status,
         notes=payload.notes,
+        match_score=payload.match_score,
         parsed_job_id=payload.parsed_job_id,
         generated_cv_id=payload.generated_cv_id,
         cover_letter_text=payload.cover_letter_text,
